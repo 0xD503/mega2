@@ -30,7 +30,8 @@
 ;;
 ;; What it costs.  The lines are worked out after a command, for the line the
 ;; cursor is on, and kept for as long as the cursor stays on that line and
-;; nothing above it changes: typing along a line works nothing out again.
+;; neither its indentation nor anything above it changes.  Typing along a
+;; line works nothing out again: a command then pays for five comparisons.
 ;; No more than `mega-context-scan-lines' lines are looked at.
 
 ;;; Code:
@@ -62,10 +63,13 @@ and a label, which is also what `public:' is.")
 One object, so that a line somebody else put there is told from ours.")
 
 (defvar-local mega-context--known nil
-  "What was worked out last: (LINE-START INDENTATION . HEADERS).")
+  "What was worked out last, as a list of five.
+The start of the line it was worked out for; where that line's
+indentation ended; whether the line was blank; what
+`mega-context--indentation' said of it; and the lines that were found.")
 
 (defvar-local mega-context--changes 0
-  "How often text above the line that was worked out about has changed.")
+  "How often what was worked out has been made void by a change of the text.")
 
 (defvar-local mega-context--skip 'unknown
   "The entry of `mega-context-skip' for this buffer's mode, once looked up.")
@@ -224,15 +228,23 @@ where the line that is furthest away stands."
         (indent (mega-context--indentation)))
     (unless (and mega-context--known
                  (eql (car mega-context--known) start)
-                 (eql (cadr mega-context--known) indent))
+                 (eql (nth 3 mega-context--known) indent))
       (setq mega-context--known
-            (cons start (cons indent (mega-context-headers)))))
-    (cddr mega-context--known)))
+            (list start
+                  (save-excursion (back-to-indentation) (point))
+                  (save-excursion (beginning-of-line) (mega-context--blank-p))
+                  indent
+                  (mega-context-headers))))
+    (nth 4 mega-context--known)))
 
 (defun mega-context--changed (start _end _length)
-  "Forget what was worked out, if text above the line it was about changed."
+  "Forget what was worked out, if the change at START can have made it wrong.
+That is a change above the line it was about, or in that line's
+indentation.  A blank line stands where its neighbours put it, so there
+any change will do."
   (when (and mega-context--known
-             (< start (car mega-context--known)))
+             (or (nth 2 mega-context--known)
+                 (<= start (nth 1 mega-context--known))))
     (setq mega-context--known nil
           mega-context--changes (1+ mega-context--changes))))
 
@@ -284,11 +296,36 @@ WINDOW defaults to the selected one."
                 (set-window-parameter window 'mega-context
                                       (and text (list (current-buffer) text key)))
                 (force-mode-line-update)))
-            (mega-context--fit)))))))
+            (mega-context--fit)
+            (set-window-parameter window 'mega-context-seen
+                                  (mega-context--seen window))))))))
+
+(defun mega-context--seen (window)
+  "What the line above the text of WINDOW depends on, as things are now.
+For the selected window, with its buffer current."
+  (list (current-buffer)
+        (line-beginning-position)
+        (window-start window)
+        mega-context--changes
+        (window-body-width window)))
 
 (defun mega-context--post-command ()
-  "Bring the line above the text up to date after a command."
-  (mega-context-refresh (selected-window)))
+  "Bring the line above the text up to date after a command.
+Nothing is worked out if the cursor is on the line it was on, the window
+shows what it showed, and no change has made the answer void: which is
+every command while you type along a line."
+  (let ((window (selected-window)))
+    ;; A command that worked on a buffer nobody is looking at has changed
+    ;; nothing that is shown.
+    (when (eq (window-buffer window) (current-buffer))
+      (let ((seen (window-parameter window 'mega-context-seen)))
+        (unless (and seen
+                     (eq (car seen) (current-buffer))
+                     (eql (nth 1 seen) (line-beginning-position))
+                     (eql (nth 2 seen) (window-start window))
+                     (eql (nth 3 seen) mega-context--changes)
+                     (eql (nth 4 seen) (window-body-width window)))
+          (mega-context-refresh window))))))
 
 (defun mega-context--refresh-pending ()
   "Bring the windows up to date that Emacs scrolled while drawing them."
@@ -321,7 +358,8 @@ See the Commentary of mega-context.el."
     (remove-hook 'after-change-functions #'mega-context--changed t)
     (setq mega-context--known nil)
     (dolist (window (get-buffer-window-list nil nil t))
-      (set-window-parameter window 'mega-context nil))
+      (set-window-parameter window 'mega-context nil)
+      (set-window-parameter window 'mega-context-seen nil))
     (when (eq header-line-format mega-context--format)
       (setq header-line-format nil))))
 

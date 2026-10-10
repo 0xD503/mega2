@@ -271,6 +271,16 @@ Return what the line above the text then says, or nil if there is none."
           (insert "x")
           (run-hooks 'post-command-hook))
         (should (= looked 1))
+        ;; So does typing in front of the text, which moves it over: the
+        ;; line may belong somewhere else now.
+        (back-to-indentation)
+        (insert "    ")
+        (run-hooks 'post-command-hook)
+        (should (= looked 2))
+        (delete-char -4)
+        (run-hooks 'post-command-hook)
+        (should (= looked 3))
+        (setq looked 1)
         ;; Another line is another question.
         (forward-line 3)
         (run-hooks 'post-command-hook)
@@ -284,6 +294,64 @@ Return what the line above the text then says, or nil if there is none."
         (should (= looked 3))
         (should (string-prefix-p " impl Reader ›"
                                  (substring-no-properties (mega-context--shown))))))))
+
+(ert-deftest mega-context-a-command-that-changes-nothing-works-nothing-out ()
+  "What every keystroke pays while the cursor stays on its line."
+  (mega-context-test--in #'mega-rust-mode mega-context-test--rust
+    (mega-context-mode 1)
+    (should (mega-context-test--scrolled-to "eat(token)" "eat(token)"))
+    (let ((refreshed 0)
+          (refresh (symbol-function 'mega-context-refresh)))
+      (cl-letf (((symbol-function 'mega-context-refresh)
+                 (lambda (&rest arguments)
+                   (setq refreshed (1+ refreshed))
+                   (apply refresh arguments))))
+        (end-of-line)
+        (dotimes (_ 5)
+          (insert "x")
+          (run-hooks 'post-command-hook))
+        (should (= refreshed 0))
+        ;; A line on, a scroll, a change above: each is a reason.
+        (forward-line 1)
+        (run-hooks 'post-command-hook)
+        (should (= refreshed 1))
+        (set-window-start (selected-window)
+                          (save-excursion (forward-line -3) (point)))
+        (run-hooks 'post-command-hook)
+        (should (= refreshed 2))
+        (save-excursion (goto-char (point-min)) (insert "// first\n"))
+        (run-hooks 'post-command-hook)
+        (should (= refreshed 3))
+        ;; On a blank line any change is, since its place is its neighbours'.
+        (mega-context-test--at "None => stop()")
+        (forward-line -1)
+        (run-hooks 'post-command-hook)
+        (setq refreshed 0)
+        (save-excursion (goto-char (point-max)) (insert "// last\n"))
+        (run-hooks 'post-command-hook)
+        (should (= refreshed 1))))))
+
+(ert-deftest mega-context-a-command-on-a-buffer-nobody-sees-works-nothing-out ()
+  "A program that edits a buffer in the background pays nothing either."
+  (mega-context-test--in #'mega-rust-mode mega-context-test--rust
+    (mega-context-mode 1)
+    (let ((refreshed 0))
+      (cl-letf (((symbol-function 'mega-context-refresh)
+                 (lambda (&rest _) (setq refreshed (1+ refreshed)))))
+        (with-temp-buffer
+          (insert "fn hidden() {\n    work();\n}\n")
+          (mega-rust-mode)
+          (mega-context-mode 1)
+          (goto-char (point-min))
+          (forward-line 1)
+          (dotimes (_ 3)
+            (insert "x")
+            (run-hooks 'post-command-hook))
+          (should (= refreshed 0)))
+        ;; The buffer that is looked at is another matter.
+        (mega-context-test--at "eat(token)")
+        (run-hooks 'post-command-hook)
+        (should (= refreshed 1))))))
 
 (ert-deftest mega-context-each-window-says-what-is-above-its-own-cursor ()
   (mega-context-test--in #'mega-rust-mode mega-context-test--rust
