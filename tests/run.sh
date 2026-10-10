@@ -213,6 +213,21 @@ unit_pass() {
           (let ((only (getenv "MEGA_TEST_ONLY")))
             (if (member only (list nil "")) t only)))' 2>&1 < /dev/null)
     rc=$?
+    # Emacs counts a test that was left by a quit, which is what C-g raises,
+    # neither as failed nor as skipped, and ends as if all were well.  A
+    # test that did not come to its end has not passed: every test is to
+    # be accounted for, as expected or as skipped.
+    counted=$(printf '%s\n' "$out" | sed -n \
+        's/^Ran \([0-9]*\) tests, \([0-9]*\) results as expected, \([0-9]*\) unexpected\(, \([0-9]*\) skipped\)\{0,1\}.*/\1 \2 \5/p')
+    if [ "$rc" -eq 0 ] && [ -n "$counted" ]; then
+        # shellcheck disable=SC2086  # three numbers, the last may be missing
+        set -- $counted
+        if [ "$1" -ne $(($2 + ${3:-0})) ]; then
+            rc=1
+            out="$out
+$(($1 - $2 - ${3:-0})) of the $1 tests did not come to an end: left by a quit"
+        fi
+    fi
     if [ "$rc" -eq 0 ]; then
         ok "unit  $form: $(printf '%s\n' "$out" | sed -n 's/^Ran \([0-9]* tests\), \([0-9]* results as expected\).*/\1, \2/p')"
         # A test that did not run is not a test that passed: say which.
