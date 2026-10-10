@@ -182,18 +182,29 @@ container all run code that comes with the project. Until you say so, none
 of them does: a project you have not trusted is only edited, and the
 modeline says `untrusted`.
 
-`C-c y` trusts the project of the file you are in, and what was held back
-starts in its open files. `M-x mega-distrust-project` takes that back.
+The first time you open a file of a project yourself, with `C-x C-f`, the
+project's file prompt or the home page, MEGA asks whether to trust the
+project. A no is remembered and the question does not come back; `C-c y`
+trusts the project of the file you are in whenever you like, and what was
+held back starts in its open files. `M-x mega-distrust-project` takes that
+back. Leaving the question with `C-g` decides nothing.
 
-MEGA never asks while you open or read a file. It asks only when you press
-a key that cannot work without the answer, such as build or debug, and says
-what the answer allows. A file outside any project is trusted with the other
-files of its directory and nothing below it.
+A trusted project that has a `devcontainer.json` is asked about next:
+whether to run its tools in its container. A no there lasts until Emacs is
+restarted, and `C-c k u` starts the container at any time.
 
-That question takes the word `yes`, typed out: one key is pressed too easily
-to let a project run its code. So do the others whose yes weighs as much:
-starting or removing a container, sending text from a private file to
-Claude, downloading parsers, and deleting what MEGA has stored.
+MEGA does not ask about a file that Emacs opens along the way: a jump to a
+definition, a hit of a search, the line a debugger stops at. Besides the
+first opening it asks only when you press a key that cannot work without
+the answer, such as build or debug, and says what the answer allows. A file
+outside any project is trusted with the other files of its directory and
+nothing below it, and is not asked about when opened. `(setq
+mega-trust-ask-on-open nil)` in `local.el` leaves it all to `C-c y`.
+
+These questions take the word `yes`, typed out: one key is pressed too
+easily to let a project run its code. So do the others whose yes weighs as
+much: removing a container, sending text from a private file to Claude,
+downloading parsers, and deleting what MEGA has stored.
 
 ## Where a setting goes
 

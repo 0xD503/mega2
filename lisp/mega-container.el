@@ -850,6 +850,48 @@ Advice around the function that handles a message from a server."
   (setq compilation-parse-errors-filename-function
         #'mega-container--error-file-name))
 
+;;;; When a project is opened
+
+(defvar mega-container--not-now nil
+  "The roots whose container was offered when they were opened, this session.
+Whatever the answer was, it is not offered again before Emacs is
+restarted; `mega-container-up' starts it at any time.")
+
+(defun mega-container-approved-p (file)
+  "Non-nil if FILE, a devcontainer.json, was approved as it is now.
+That is: with the files it builds from as they are now."
+  (equal (cdr (assoc file (mega-container--approved)))
+         (mega-container--hash
+          file (mega-container-referenced-files (mega-container-read file)
+                                                (file-name-directory file)))))
+
+;;;###autoload
+(defun mega-container-offer (root)
+  "Offer to run the tools of the project at ROOT in its dev container.
+For the moment you have opened a file of a trusted project: see
+`mega-trust-opened-functions'.  Nothing is offered if the project has
+no devcontainer.json, is using its container already, or no container
+program is installed, and nothing twice in a session.
+
+If you approved the file as it is now, the question is whether to
+start.  If you did not, `mega-container-up' shows what the file would
+run and asks then, as it always does: that is the question."
+  (let* ((root (file-name-as-directory (expand-file-name root)))
+         (file (mega-container-config-file root)))
+    (when (and file
+               (not (member root mega-container--not-now))
+               (not (mega-container-attached root))
+               (not (assoc root mega-container--starting))
+               (mega-container-engine))
+      (push root mega-container--not-now)
+      (when (or (not (ignore-errors (mega-container-approved-p file)))
+                (mega-confirm (format "Run the tools of %s in its dev container? "
+                                      (abbreviate-file-name root))))
+        (let ((default-directory root))
+          (condition-case err
+              (mega-container-up)
+            (user-error (message "%s" (error-message-string err)))))))))
+
 ;;;; Commands
 
 (defun mega-container--root ()

@@ -271,5 +271,187 @@
         (should (equal heard (list (abbreviate-file-name dir)
                                    (abbreviate-file-name dir))))))))
 
+;;;; Asking when you open a project
+
+(defmacro mega-trust-test--opening (&rest body)
+  "Run BODY with a project in DIR and a file of it, BUFFER, in the selected window.
+In a session in which somebody can be asked, with an empty trust store
+and nothing asked yet.  ASKED collects the questions; the next one is
+answered ANSWER: t, nil, or `quit' for C-g."
+  (declare (indent 0))
+  `(mega-trust-test--store
+     (mega-test-write (expand-file-name "Cargo.toml" dir) "[package]" "")
+     (let* ((buffer (find-file-noselect
+                     (mega-test-write (expand-file-name "notes.txt" dir) "x" "")))
+            (noninteractive nil)
+            (mega-trust-ask-on-open t)
+            (mega-trust--asked nil)
+            (mega-trust-opened-functions nil)
+            (asked nil)
+            (answer t))
+       (cl-letf (((symbol-function 'mega-confirm)
+                  (lambda (prompt)
+                    (push prompt asked)
+                    (if (eq answer 'quit) (signal 'quit nil) answer)))
+                 ((symbol-function 'y-or-n-p)
+                  (lambda (&rest _) (error "One key was asked for"))))
+         (unwind-protect
+             (save-window-excursion
+               (switch-to-buffer buffer)
+               ,@body)
+           (kill-buffer buffer))))))
+
+(defun mega-trust-test--command (command)
+  "What MEGA does after COMMAND has run."
+  (let ((this-command command))
+    (mega-trust--after-command)))
+
+(ert-deftest mega-trust-opening-a-file-yourself-asks-once-about-its-project ()
+  "Asked for after the first use.  With the word yes: see `mega-confirm'."
+  (mega-trust-test--opening
+    (mega-trust-test--command 'find-file)
+    (should (= (length asked) 1))
+    (should (string-match-p
+             (concat "\\`Trust " (regexp-quote (abbreviate-file-name dir))
+                     "\\?  MEGA wants to run its language server")
+             (car asked)))
+    (should (eq (mega-trust-decision dir) 'trusted))
+    ;; Once: the next file of it you open asks nothing.
+    (dolist (command '(find-file project-find-file mega-home-act))
+      (mega-trust-test--command command))
+    (should (= (length asked) 1))))
+
+(ert-deftest mega-trust-every-way-of-opening-a-file-yourself-asks ()
+  (dolist (command '(find-file find-file-other-window project-find-file
+                     project-switch-project dired-find-file recentf-open
+                     speedbar-edit-line mega-home-act mega-home-open-nth
+                     mega-home-continue mega-workspace-resume))
+    (should (memq command mega-trust-opening-commands))
+    (mega-trust-test--opening
+      (mega-trust-test--command command)
+      (should (= (length asked) 1)))))
+
+(ert-deftest mega-trust-a-file-emacs-opens-on-its-own-asks-nothing ()
+  "A jump to a definition, a hit of a search, a line the debugger stops at."
+  (mega-trust-test--opening
+    (dolist (command '(xref-find-definitions xref-go-back next-error
+                       mega-search-project mega-debug-next gud-next
+                       switch-to-buffer self-insert-command nil))
+      (mega-trust-test--command command))
+    (should-not asked)
+    (should-not (mega-trust-decision dir))
+    ;; And the function that looks is on the hook, where it costs one look.
+    (should (memq #'mega-trust--after-command (default-value 'post-command-hook)))))
+
+(ert-deftest mega-trust-a-no-when-opening-is-kept-and-can-be-taken-back ()
+  (mega-trust-test--opening
+    (setq answer nil)
+    (mega-trust-test--command 'find-file)
+    (should (= (length asked) 1))
+    (should (eq (mega-trust-decision dir) 'untrusted))
+    ;; Not again: not now, and not in the next session either.
+    (mega-trust-test--command 'find-file)
+    (setq mega-trust--asked nil)
+    (mega-trust-test--command 'find-file)
+    (should (= (length asked) 1))
+    ;; Until you say otherwise yourself.
+    (mega-trust-project)
+    (should (eq (mega-trust-decision dir) 'trusted))))
+
+(ert-deftest mega-trust-leaving-the-question-decides-nothing ()
+  (mega-trust-test--opening
+    (setq answer 'quit)
+    ;; C-g ends the question and nothing else.
+    (mega-trust-test--command 'find-file)
+    (should (= (length asked) 1))
+    (should-not (mega-trust-decision dir))
+    ;; Not asked again in this session...
+    (mega-trust-test--command 'find-file)
+    (should (= (length asked) 1))
+    ;; ...and asked again in the next.
+    (setq mega-trust--asked nil
+          answer t)
+    (mega-trust-test--command 'find-file)
+    (should (= (length asked) 2))
+    (should (eq (mega-trust-decision dir) 'trusted))))
+
+(ert-deftest mega-trust-only-a-project-is-asked-about-when-opened ()
+  (mega-trust-test--opening
+    ;; A file that lies in no project: its directory is not asked about.
+    (mega-test-with-directory lone
+      (let ((other (find-file-noselect
+                    (mega-test-write (expand-file-name "notes.txt" lone) "x" ""))))
+        (unwind-protect
+            (save-window-excursion
+              (switch-to-buffer other)
+              (mega-trust-test--command 'find-file))
+          (kill-buffer other))))
+    ;; A buffer with no file, and a file on another machine.
+    (with-temp-buffer
+      (save-window-excursion
+        (switch-to-buffer (current-buffer))
+        (mega-trust-test--command 'find-file)
+        (setq buffer-file-name "/ssh:somewhere.invalid:/src/main.rs"
+              default-directory "/ssh:somewhere.invalid:/src/")
+        (cl-letf (((symbol-function 'mega-trust--project-root)
+                   (lambda (&rest _) "/ssh:somewhere.invalid:/src/")))
+          (mega-trust-test--command 'find-file))
+        (setq buffer-file-name nil
+              default-directory temporary-file-directory)))
+    (should-not asked)))
+
+(ert-deftest mega-trust-nothing-is-asked-on-opening-if-you-said-so-or-nobody-is-there ()
+  (mega-trust-test--opening
+    (let ((mega-trust-ask-on-open nil))
+      (mega-trust-test--command 'find-file)
+      ;; However it is come by: a file Emacs was started on, say.
+      (mega-trust-opened))
+    ;; A script that opens files is never asked.
+    (let ((noninteractive t))
+      (mega-trust-test--command 'find-file))
+    (should-not asked)
+    (should-not (mega-trust-decision dir))))
+
+(ert-deftest mega-trust-a-trusted-project-is-handed-on-when-opened ()
+  "To what else has a question about a project: its dev container."
+  (mega-trust-test--opening
+    (let ((handed nil))
+      (add-hook 'mega-trust-opened-functions (lambda (root) (push root handed)))
+      ;; Refused: nothing else is asked about it.
+      (setq answer nil)
+      (mega-trust-test--command 'find-file)
+      (should-not handed)
+      ;; Trusted, now or before: handed on, with the root as it is on disk.
+      (mega-trust-project)
+      (mega-trust-test--command 'find-file)
+      (should (equal handed (list (file-name-as-directory (expand-file-name dir)))))
+      ;; A question left with C-g there ends there.
+      (setq mega-trust-opened-functions (list (lambda (_) (signal 'quit nil))))
+      (mega-trust-test--command 'find-file)
+      (should (eq (mega-trust-decision dir) 'trusted))))
+  ;; What is handed on to, as MEGA is set up.
+  (should (memq #'mega-container-offer mega-trust-opened-functions)))
+
+(ert-deftest mega-trust-a-mistake-while-asking-does-not-end-the-asking ()
+  "Emacs takes a function off `post-command-hook' for good when it fails."
+  (mega-trust-test--opening
+    (mega-trust-project)
+    (setq mega-trust-opened-functions (list (lambda (_) (error "Broken"))))
+    (mega-trust-test--command 'find-file)
+    (should (memq #'mega-trust--after-command (default-value 'post-command-hook)))))
+
+(ert-deftest mega-trust-a-file-emacs-was-started-on-is-asked-about-on-screen ()
+  "Not while starting: once Emacs has drawn it."
+  (let ((noninteractive nil)
+        (mega-trust-ask-on-open t)
+        (timer-list nil))
+    (mega-trust--after-startup)
+    (should (= (length timer-list) 1))
+    (should (eq (timer--function (car timer-list)) #'mega-trust-opened)))
+  (let ((timer-list nil))
+    (mega-trust--after-startup)
+    (should-not timer-list))
+  (should (memq #'mega-trust--after-startup emacs-startup-hook)))
+
 (provide 'mega-trust-test)
 ;;; mega-trust-test.el ends here

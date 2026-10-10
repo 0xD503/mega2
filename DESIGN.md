@@ -91,10 +91,21 @@ Examples of that ordering already decided:
      (build scripts, macros, plugins, a Makefile). None of them starts in a
      project you have not trusted, and that includes what Emacs would start
      by itself: its on-the-fly checker runs `make` for C and `perl -c` for
-     Perl. Trust is an act, `C-c y`, not an answer to a prompt met in
-     passing: MEGA never asks from a hook, a timer or a process filter,
-     only from a command that cannot go on without the answer. The
-     modeline shows `untrusted` where tools are held back.
+     Perl. The modeline shows `untrusted` where tools are held back, and
+     `C-c y` trusts a project at any time.
+   - **When trust is asked for.** Once, when you open a file of a project
+     yourself that nothing was ever said about; and from a command that
+     cannot go on without the answer. Never about a file Emacs opens along
+     the way, a jump to a definition or a line the debugger stops at, and
+     never from a process filter or a timer of its own: a question met in
+     passing is one you learn to answer yes to. "Yourself" is a list of
+     commands whose purpose is opening a file (`mega-trust-opening-commands`),
+     and the question comes after the command, not from inside it. The
+     review had taken the question at opening away altogether, for that
+     reason; its user asked for it back after the first day, with the word
+     yes in place of a key, which answers the reason. A trusted project
+     with a `devcontainer.json` is then offered its container, once a
+     session.
    - **Two kinds of question.** One key answers what can be taken back.
      The word yes, typed out, answers what lets code run, lets text leave
      the machine, or cannot be undone: trust, starting or removing a

