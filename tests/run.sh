@@ -27,6 +27,9 @@
 # Afterwards the configuration directory must be exactly as it was: MEGA
 # never writes into it.
 #
+# A local.el in the configuration is one machine's settings, and is left out:
+# the tests then run on a copy of the configuration without it, and say so.
+#
 # usage: tests/run.sh [STAGE...]
 #
 #   STAGE              run only these stages (default: the first five)
@@ -87,6 +90,20 @@ trap 'rm -rf -- "$SANDBOX"; exit 143' TERM
 # stage that runs one, the container stage; everything else never sees it.
 export -p | grep -E '^(export|declare -x) (HOME|XDG_[A-Z_]+|TMPDIR)=' \
     > "$SANDBOX/real-environment"
+
+# What is tested is MEGA, not one machine's settings.  A configuration that
+# is in use has a local.el; then the tests run on a copy of it without one.
+LEFT_OUT=
+if [ -e "$CONFIG/local.el" ] || [ -L "$CONFIG/local.el" ]; then
+    LEFT_OUT="$CONFIG/local.el"
+    if ! mkdir -- "$SANDBOX/mega" ||
+        ! cp -R -- "$CONFIG/early-init.el" "$CONFIG/init.el" "$CONFIG/lisp" \
+            "$CONFIG"/*.md "$SANDBOX/mega/"; then
+        printf '%s: cannot copy the configuration: %s\n' "$0" "$CONFIG" >&2
+        exit 1
+    fi
+    CONFIG="$SANDBOX/mega"
+fi
 
 mkdir -- "$SANDBOX/home" "$SANDBOX/tmp" "$SANDBOX/elc"
 HOME="$SANDBOX/home"
@@ -600,6 +617,9 @@ for stage do
         *) printf '%s: unknown stage: %s\n' "$0" "$stage" >&2; exit 2 ;;
     esac
 done
+
+[ -z "$LEFT_OUT" ] ||
+    printf 'note  %s is left out: this is a copy of MEGA without it\n' "$LEFT_OUT"
 
 fingerprint > "$SANDBOX/config.before"
 

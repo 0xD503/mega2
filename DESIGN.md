@@ -345,6 +345,11 @@ and a sixth when it is asked for by name:
 
 Afterwards the configuration directory must be byte-for-byte what it was.
 
+The repository is the configuration directory, so a clone that is in use
+has a `local.el` in it, and that is one machine's settings: the runner
+leaves it out, by testing a copy of the configuration without it, and says
+so. What is tested is MEGA.
+
 The bench stage is how performance, last of the priorities, is still kept
 honest. Each benchmark states what it took on the machine the figures were
 set on, and the run prints every time beside that figure. Over one and a
