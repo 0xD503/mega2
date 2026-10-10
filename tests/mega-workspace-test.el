@@ -390,10 +390,19 @@ what Emacs calls init: that part ends before the hook has run."
 
 (ert-deftest mega-home-age-reads-naturally ()
   (let ((now (float-time)))
-    (should (equal (mega-home--age (- now 20)) "just now"))
-    (should (equal (mega-home--age (- now 600)) "10 minutes ago"))
-    (should (equal (mega-home--age (- now 10800)) "3 hours ago"))
-    (should (equal (mega-home--age (- now 259200)) "3 days ago"))))
+    (should (equal (mega-age (- now 20)) "just now"))
+    (should (equal (mega-age (- now 600)) "10 minutes ago"))
+    (should (equal (mega-age (- now 10800)) "3 hours ago"))
+    (should (equal (mega-age (- now 259200)) "3 days ago"))
+    (should (equal (mega-age (- now (* 21 86400))) "3 weeks ago"))
+    (should (equal (mega-age (- now (* 200 86400))) "7 months ago"))
+    (should (equal (mega-age (- now (* 1100 86400))) "3 years ago"))
+    ;; A clock that is a little ahead somewhere is not the future.
+    (should (equal (mega-age (+ now 300)) "just now"))
+    ;; And the number is never one, so the unit never needs a singular.
+    (dolist (seconds '(89 90 5399 5400 129599 129600 1209599 1209600
+                       5183999 5184000 63071999 63072000))
+      (should-not (string-match-p "\\`1 " (mega-age (- now seconds)))))))
 
 (ert-deftest mega-home-return-opens-what-the-line-offers ()
   (mega-workspace-test--home (list dir)

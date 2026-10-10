@@ -194,6 +194,21 @@ Memoised: MEGA asks about the same dozen programs repeatedly, and
         (puthash name (executable-find name) mega--exe-cache)
       hit)))
 
+;;;; How long ago
+
+(defun mega-age (time)
+  "Describe how long ago TIME was; TIME is in seconds since the epoch.
+The units change where the number would otherwise be one, so there is
+no \"1 days ago\" to avoid."
+  (let ((seconds (- (float-time) time)))
+    (cond ((< seconds 90) "just now")
+          ((< seconds 5400) (format "%d minutes ago" (round seconds 60)))
+          ((< seconds 129600) (format "%d hours ago" (round seconds 3600)))
+          ((< seconds 1209600) (format "%d days ago" (round seconds 86400)))
+          ((< seconds 5184000) (format "%d weeks ago" (round seconds 604800)))
+          ((< seconds 63072000) (format "%d months ago" (round seconds 2629800)))
+          (t (format "%d years ago" (round seconds 31557600))))))
+
 ;;;; Questions
 ;;
 ;; MEGA asks two kinds.  One key answers what can be taken back: `y-or-n-p'.

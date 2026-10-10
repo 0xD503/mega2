@@ -236,6 +236,27 @@ Word boundaries, not symbol boundaries: in many languages the colon of
 (autoload 'mega-indent-guides-mode "mega-indent-guides" nil t)
 (add-hook 'prog-mode-hook #'mega-indent-guides-mode)
 
+;;;; Who changed this line
+;;
+;; The mode itself is in mega-blame.el and loads with the first file.
+
+(defcustom mega-blame t
+  "Whether a file that git keeps shows who changed the current line last.
+Nil switches that off everywhere; `M-x mega-blame-mode' still turns it
+on in one buffer."
+  :type 'boolean :group 'mega)
+
+(autoload 'mega-blame-mode "mega-blame" nil t)
+
+(defun mega-edit--blame ()
+  "Turn `mega-blame-mode' on in a buffer that visits a file on this machine."
+  (when (and mega-blame
+             buffer-file-name
+             (not (file-remote-p buffer-file-name)))
+    (mega-blame-mode 1)))
+
+(add-hook 'find-file-hook #'mega-edit--blame)
+
 ;;;; Typing conveniences, all from Emacs itself
 
 (delete-selection-mode 1)

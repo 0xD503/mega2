@@ -88,6 +88,12 @@ In code, `C-c C-c` comments or uncomments, `C-c f` folds the block the cursor
 is in (`C-c F`: all of them), and `M-n` / `M-p` jump between the uses of the
 symbol at point.
 
+**Who changed this line.** In a file that git keeps, the line the cursor
+rests on says at its end who changed it last, how long ago and in which
+change; a line you have changed since says `not committed yet`. `M-x
+mega-blame-mode` switches that off in a buffer, `(setq mega-blame nil)` in
+`local.el` everywhere.
+
 The mouse works in the terminal: click, scroll, hover for a hint. Selecting
 text with the terminal itself then needs Shift held down; `(setq mega-mouse
 nil)` in `local.el` gives the mouse back to the terminal.

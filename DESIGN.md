@@ -19,7 +19,7 @@ packages and 15 tree-sitter parsers; 2.0 pulls none.
 | Project search | Live, as you type |
 | Kept from MEGA 1 | Workspaces, Claude CLI, undo tree + persistent undo, indent guides |
 | Added | Tasks, debugger, format on save, snippets, Dev Containers, vertical ruler |
-| Not wanted | Git workflow beyond stock `vc`; spell and grammar checking |
+| Not wanted | Git workflow beyond stock `vc`, with one addition asked for after the first use: who changed the current line. Spell and grammar checking |
 | Dev Containers | MEGA-native subset; official `devcontainer` CLI when it is installed |
 | Location | A repository of its own, cloned to `~/.mega2.d`; the default chemacs2 profile |
 | Licence | Apache-2.0. `NOTICE` names the copyright holder; the code is MEGA's own, so there is nobody else's licence to honour |
@@ -175,6 +175,7 @@ project shell; editable grep results; GUD debuggers (gdb, lldb, pdb).
 | Debug adapter client | Own client for the Debug Adapter Protocol: breakpoints that outlive sessions, stack, variables, output |
 | Workspaces | The open files and the window layout, saved under a name and resumed |
 | Small helpers | Indent guides, TODO highlight, symbol jump, trim changed lines, clipboard bridge |
+| Who changed this line | At the end of the line the cursor rests on: who, how long ago, in which change. git is asked about that one line when Emacs is idle, in the background, about the text on screen whether saved or not, and with `--no-textconv`, without which it runs a converter the repository can name |
 | Modes | Markdown, Zig, justfile, Rust fallback |
 
 ### Not in 2.0

@@ -433,6 +433,15 @@ terminal_run() {
         rc=1
     fi
 
+    # And who changed a line: the probe commits one as Ada Lovelace.
+    if [ "$T_EXPECT" = supported ] && [ -f "$MEGA_TEST_REPORT" ] &&
+        command -v git >/dev/null 2>&1 &&
+        ! grep -q 'Ada Lovelace, just now' "$SANDBOX/screen"; then
+        printf 'problem: who changed a line was never drawn on the terminal\n' \
+            >> "$MEGA_TEST_REPORT"
+        rc=1
+    fi
+
     if [ ! -f "$MEGA_TEST_REPORT" ]; then
         bad "$label: no report (exit $rc); Emacs did not finish starting"
     elif [ "$rc" -ne 0 ] || ! grep -q '^verdict=ok$' "$MEGA_TEST_REPORT" ||

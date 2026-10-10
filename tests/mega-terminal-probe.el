@@ -327,6 +327,59 @@ looks for the picture itself in what the terminal was sent."
         (kill-buffer "mega-probe-undo"))
     (error (mega-terminal-probe--problem "the undo tree failed: %S" err))))
 
+(defun mega-terminal-probe--blame ()
+  "Check, on the live terminal, that a line says who changed it last.
+A file that git keeps is opened as any file is, and nothing else is
+done to switch the note on.  The runner looks for the note in what the
+terminal was sent."
+  (defvar mega-blame-mode)
+  (defvar mega-blame--overlay)
+  (defvar mega-blame--timer)
+  (defvar mega-blame--process)
+  (declare-function mega-blame--idle "mega-blame")
+  (when (executable-find "git")
+    (condition-case err
+        (let* ((dir (file-name-as-directory (make-temp-file "mega-probe-blame-" t)))
+               (file (expand-file-name "poem.txt" dir))
+               (default-directory dir)
+               (git (lambda (&rest args)
+                      (unless (eql 0 (apply #'call-process "git" nil nil nil
+                                            "-c" "user.name=Ada Lovelace"
+                                            "-c" "user.email=ada@example.invalid"
+                                            "-c" "commit.gpgsign=false" args))
+                        (error "git %s failed" args)))))
+          (with-temp-file file (insert "one\ntwo\n"))
+          (funcall git "init" "--quiet")
+          (funcall git "add" "poem.txt")
+          (funcall git "commit" "--quiet" "-m" "A poem")
+          (save-window-excursion
+            (delete-other-windows)
+            (find-file file)
+            (unless (bound-and-true-p mega-blame-mode)
+              (mega-terminal-probe--problem "opening a file did not switch on the note of who changed a line"))
+            (unless (and (timerp mega-blame--timer)
+                         (memq mega-blame--timer timer-idle-list))
+              (mega-terminal-probe--problem "nothing waits for Emacs to be idle to ask git"))
+            (redisplay t)
+            ;; What that timer does, without waiting for it.
+            (mega-blame--idle)
+            (let ((deadline (+ (float-time) 10)))
+              (while (and (process-live-p mega-blame--process)
+                          (< (float-time) deadline))
+                (accept-process-output nil 0.1)))
+            (redisplay t)
+            (let ((note (and (overlayp mega-blame--overlay)
+                             (overlay-get mega-blame--overlay 'after-string))))
+              (cond ((not (and note (string-match-p "Ada Lovelace, just now · A poem" note)))
+                     (mega-terminal-probe--problem
+                      "the line does not say who changed it: %S" note))
+                    ((> (+ 3 (string-width note)) (window-max-chars-per-line))
+                     (mega-terminal-probe--problem
+                      "the note on who changed a line does not fit its window"))))
+            (kill-buffer)))
+      (error (mega-terminal-probe--problem
+              "the note on who changed a line failed: %S" err)))))
+
 (defun mega-terminal-probe--form ()
   "Check that MEGA's Lisp runs in the form MEGA_TEST_FORM names.
 \"compiled\": from a compiled copy that was there.  \"make\": from source,
@@ -439,6 +492,7 @@ copy as native code.  Anything else: from source."
   (mega-terminal-probe--navigation)
   (mega-terminal-probe--completion)
   (mega-terminal-probe--undo)
+  (mega-terminal-probe--blame)
   (mega-terminal-probe--processes)
   (mega-terminal-probe--untrusted)
   (when (and (equal (getenv "MEGA_TEST_LAUNCHER") "chemacs")

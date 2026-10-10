@@ -77,14 +77,6 @@ its directory still exists."
                         (or (file-remote-p root) (file-directory-p root)))
                       roots))))
 
-(defun mega-home--age (time)
-  "Describe how long ago TIME, a float, was."
-  (let ((seconds (- (float-time) time)))
-    (cond ((< seconds 90) "just now")
-          ((< seconds 5400) (format "%d minutes ago" (round seconds 60)))
-          ((< seconds 129600) (format "%d hours ago" (round seconds 3600)))
-          (t (format "%d days ago" (round seconds 86400))))))
-
 ;;;; What choosing does
 
 (defun mega-home-open-project (root)
@@ -200,7 +192,7 @@ The page shows no cursor, so this is how you see where you are."
       (mega-home--line "r" (plist-get last :name)
                        (format "%d files, closed %s"
                                (length (plist-get last :files))
-                               (mega-home--age (plist-get last :saved)))
+                               (mega-age (plist-get last :saved)))
                        #'mega-home-continue)
       (insert "\n"))
     (when projects
