@@ -309,7 +309,7 @@ built as well: asking for all of them is asking for those."
     (cond
      ((null missing)
       (message "Every parser MEGA has a mode for is built"))
-     ((yes-or-no-p (format "Download and build %d parser%s (%s)? "
+     ((mega-confirm (format "Download and build %d parser%s (%s)? "
                            (length missing) (if (cdr missing) "s" "") names))
       (dolist (entry missing)
         (setq count (1+ count))

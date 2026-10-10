@@ -12,8 +12,9 @@
 ;;   ? d      the keys, the doctor
 ;;   g q      refresh, leave
 ;;
-;; RET does the same for the line the cursor is on.  The first line says how
-;; long Emacs took to start.
+;; C-n and C-p, the arrows and TAB go from one thing that can be chosen to the
+;; next, and RET chooses the one that is marked.  The first line says how long
+;; Emacs took to start.
 ;;
 ;; The page only lists.  Nothing is opened until you choose, so a remote or
 ;; vanished project cannot slow startup down; a project whose directory is
@@ -48,6 +49,8 @@
   "A key on the home page." :group 'mega)
 (defface mega-home-detail '((t :inherit shadow))
   "Secondary text on the home page." :group 'mega)
+(defface mega-home-current '((t :inherit highlight :extend t))
+  "The line of the home page that RET would act on." :group 'mega)
 
 ;;;; What the page knows
 
@@ -127,6 +130,33 @@ Interactively, N is the digit that was typed."
   (interactive)
   (quit-window))
 
+(defun mega-home-move (count)
+  "Go COUNT lines that offer something on; back, if COUNT is negative.
+Past the last one comes the first, and before the first the last."
+  (let ((step (if (< count 0) -1 1)))
+    (dotimes (_ (abs count))
+      (let ((start (line-beginning-position))
+            (looking t))
+        (while looking
+          (when (or (/= 0 (forward-line step)) (eobp))
+            (goto-char (if (> step 0) (point-min) (point-max)))
+            (forward-line 0))
+          (when (or (get-text-property (point) 'mega-home-action)
+                    ;; All the way round: there is no other.
+                    (= (point) start))
+            (setq looking nil)))))
+    (mega-home--mark-current)))
+
+(defun mega-home-next (&optional count)
+  "Go to the next thing that can be chosen; with a number, COUNT of them on."
+  (interactive "p")
+  (mega-home-move (or count 1)))
+
+(defun mega-home-previous (&optional count)
+  "Go to the previous thing that can be chosen; with a number, COUNT back."
+  (interactive "p")
+  (mega-home-move (- (or count 1))))
+
 ;;;; The page
 
 (defun mega-home--line (key text detail action)
@@ -137,6 +167,20 @@ Interactively, N is the digit that was typed."
       (insert "  " (propertize detail 'face 'mega-home-detail)))
     (insert "\n")
     (put-text-property start (point) 'mega-home-action action)))
+
+(defvar-local mega-home--current nil
+  "The overlay that marks the line RET would act on.")
+
+(defun mega-home--mark-current ()
+  "Mark the line the cursor is on, if it offers something.
+The page shows no cursor, so this is how you see where you are."
+  (unless (overlayp mega-home--current)
+    (setq mega-home--current (make-overlay 1 1))
+    (overlay-put mega-home--current 'face 'mega-home-current))
+  (if (get-text-property (line-beginning-position) 'mega-home-action)
+      (move-overlay mega-home--current
+                    (line-beginning-position) (line-beginning-position 2))
+    (move-overlay mega-home--current 1 1)))
 
 (defun mega-home--insert ()
   "Insert the home page at point."
@@ -187,6 +231,10 @@ Interactively, N is the digit that was typed."
 (defvar mega-home-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "RET") #'mega-home-act)
+    (dolist (key '("C-n" "<down>" "TAB"))
+      (define-key map (kbd key) #'mega-home-next))
+    (dolist (key '("C-p" "<up>" "<backtab>"))
+      (define-key map (kbd key) #'mega-home-previous))
     (define-key map "r" #'mega-home-continue)
     (dotimes (n 9)
       (define-key map (number-to-string (1+ n)) #'mega-home-open-nth))
@@ -203,7 +251,9 @@ Interactively, N is the digit that was typed."
 (define-derived-mode mega-home-mode special-mode "Home"
   "The page Emacs opens on.  See the Commentary of mega-home.el."
   (setq-local cursor-type nil
-              truncate-lines t))
+              truncate-lines t)
+  ;; However the cursor got where it is: a click, a search, a page down.
+  (add-hook 'post-command-hook #'mega-home--mark-current nil t))
 
 (defun mega-home-render ()
   "Create or refresh the home page buffer and return it."
@@ -217,7 +267,8 @@ Interactively, N is the digit that was typed."
       ;; Start on the first thing that can be chosen.
       (when-let* ((first (text-property-not-all (point-min) (point-max)
                                                 'mega-home-action nil)))
-        (goto-char first)))
+        (goto-char first))
+      (mega-home--mark-current))
     (current-buffer)))
 
 ;;;###autoload

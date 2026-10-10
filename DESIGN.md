@@ -95,6 +95,14 @@ Examples of that ordering already decided:
      passing: MEGA never asks from a hook, a timer or a process filter,
      only from a command that cannot go on without the answer. The
      modeline shows `untrusted` where tools are held back.
+   - **Two kinds of question.** One key answers what can be taken back.
+     The word yes, typed out, answers what lets code run, lets text leave
+     the machine, or cannot be undone: trust, starting or removing a
+     container, text from a private file for Claude, downloading parsers,
+     deleting stored undo history or a workspace. They are asked with
+     `mega-confirm`, which Emacs's `use-short-answers` does not shorten.
+     MEGA sets that option for Emacs's own questions, and until it was
+     reported from use it shortened MEGA's long ones as well.
    - **What a decision covers.** A project, by its root. A file outside any
      project: its directory and nothing below, and no longer once a project
      appears there. The home directory and `/` are never a root, whatever

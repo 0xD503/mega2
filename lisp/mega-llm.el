@@ -117,7 +117,7 @@ MEGA chose for you, you are shown the size of first."
 A file MEGA takes for private needs a typed yes, every time."
   (when (and buffer-file-name
              (mega-private-file-p buffer-file-name)
-             (not (yes-or-no-p
+             (not (mega-confirm
                    (format "%s looks private.  Send text from it to Claude anyway? "
                            (file-name-nondirectory buffer-file-name)))))
     (user-error "Nothing was sent")))

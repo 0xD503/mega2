@@ -378,7 +378,7 @@ history for."
   (let ((files (directory-files mega-undo-directory t "\\.eld\\(?:\\.new\\)?\\'" t)))
     (cond ((null files)
            (message "No undo history is stored"))
-          ((yes-or-no-p (format "Delete the stored undo history of %d files? "
+          ((mega-confirm (format "Delete the stored undo history of %d files? "
                                 (length files)))
            (mapc #'delete-file files)
            (message "Deleted")))))

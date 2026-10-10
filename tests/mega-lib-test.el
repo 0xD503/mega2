@@ -309,5 +309,55 @@ current during startup, so the setting silently does nothing elsewhere."
       (insert-file-contents file nil 0 200)
       (should (string-match-p "lexical-binding: t" (buffer-string))))))
 
+;;;; Questions
+
+(ert-deftest mega-confirm-takes-the-word-yes-whatever-is-set-for-emacs ()
+  "Reported from use: trusting a project took one key."
+  ;; Replacing a built-in function makes Emacs compile a shim into the
+  ;; temporary directory, so that has to be a real one here.
+  (let ((temporary-file-directory (file-name-as-directory (getenv "TMPDIR")))
+        (use-short-answers t)
+        (seen nil))
+    (cl-letf (((symbol-function 'yes-or-no-p)
+               (lambda (prompt) (push (cons prompt use-short-answers) seen) t))
+              ((symbol-function 'y-or-n-p)
+               (lambda (&rest _) (error "One key was asked for"))))
+      (should (eq (mega-confirm "Sure? ") t))
+      ;; Asked as the long question, with the shortening switched off.
+      (should (equal seen '(("Sure? " . nil)))))
+    ;; And only for the time of the question.
+    (should use-short-answers)))
+
+(ert-deftest mega-confirm-is-how-every-long-question-of-mega-s-is-asked ()
+  "`use-short-answers' turns `yes-or-no-p' into one key, wherever it is called."
+  (let ((callers nil))
+    (dolist (file (append (directory-files mega-lisp-dir t "\\.el\\'")
+                          (list (expand-file-name "init.el" mega-dir)
+                                (expand-file-name "early-init.el" mega-dir))))
+      (with-temp-buffer
+        (insert-file-contents file)
+        (while (re-search-forward "(yes-or-no-p\\_>" nil t)
+          (push (file-name-nondirectory file) callers))))
+    ;; The one place is `mega-confirm' itself.
+    (should (equal callers '("mega-lib.el")))))
+
+(ert-deftest mega-confirm-is-what-the-weighty-questions-use ()
+  "Code that runs, text that leaves, things that are gone for good."
+  (let ((expected '(("mega-trust.el" . "Trust %s\\?")
+                    ("mega-container.el" . "Start this container")
+                    ("mega-container.el" . "Remove this project's container")
+                    ("mega-llm.el" . "looks private")
+                    ("mega-lang.el" . "Download and build")
+                    ("mega-undo.el" . "Delete the stored undo history")
+                    ("mega-workspace.el" . "Forget the saved workspace"))))
+    (dolist (case expected)
+      (with-temp-buffer
+        (insert-file-contents (expand-file-name (car case) mega-lisp-dir))
+        (ert-info ((format "%s: %s" (car case) (cdr case)))
+          (should (re-search-forward
+                   (concat "(mega-confirm[ \n]+\\(?:(format[ \n]+\\)?\"[^\"]*"
+                           (cdr case))
+                   nil t)))))))
+
 (provide 'mega-lib-test)
 ;;; mega-lib-test.el ends here

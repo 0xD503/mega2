@@ -194,6 +194,20 @@ Memoised: MEGA asks about the same dozen programs repeatedly, and
         (puthash name (executable-find name) mega--exe-cache)
       hit)))
 
+;;;; Questions
+;;
+;; MEGA asks two kinds.  One key answers what can be taken back: `y-or-n-p'.
+;; The word yes, typed out, answers what cannot, and what lets code run or
+;; lets something leave this machine: `mega-confirm'.  A key is pressed
+;; before the question is read, now and then; a word is not typed that way.
+
+(defun mega-confirm (prompt)
+  "Ask PROMPT, and return t only for the word yes, typed out.
+`use-short-answers' shortens the long questions of Emacs itself, which
+MEGA sets it to do; it does not shorten this one."
+  (let ((use-short-answers nil))
+    (yes-or-no-p prompt)))
+
 (defvar mega-forget-functions nil
   "Functions that forget what a module found out about the programs installed.
 Called by `mega-forget-executables'; each module that remembers the

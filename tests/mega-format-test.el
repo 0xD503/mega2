@@ -28,7 +28,7 @@
   (mega-format-test--trust-store
     (mega-test-with-directory dir
       (let (asked)
-        (cl-letf (((symbol-function 'y-or-n-p) (lambda (&rest _) (setq asked t) t)))
+        (cl-letf (((symbol-function 'mega-confirm) (lambda (&rest _) (setq asked t) t)))
           (should-not (mega-trust-p dir t "run its formatter"))
           (should-not asked)
           (should-not (mega-trust-decision dir)))))))
@@ -37,8 +37,11 @@
   (mega-format-test--trust-store
     (mega-test-with-directory dir
       (let ((noninteractive nil) (asked 0) question)
-        (cl-letf (((symbol-function 'y-or-n-p)
-                   (lambda (prompt) (setq asked (1+ asked) question prompt) t)))
+        (cl-letf (((symbol-function 'mega-confirm)
+                   (lambda (prompt) (setq asked (1+ asked) question prompt) t))
+                  ;; Letting a project run its code takes the word yes.
+                  ((symbol-function 'y-or-n-p)
+                   (lambda (&rest _) (error "Trust was asked for with one key"))))
           (should (mega-trust-p dir t "start its language server"))
           (should (mega-trust-p dir t "start its language server"))
           (should (= asked 1))
@@ -71,7 +74,7 @@
   (mega-format-test--trust-store
     (mega-test-with-directory dir
       (let ((noninteractive nil) (asked 0))
-        (cl-letf (((symbol-function 'y-or-n-p) (lambda (&rest _) (setq asked (1+ asked)) nil)))
+        (cl-letf (((symbol-function 'mega-confirm) (lambda (&rest _) (setq asked (1+ asked)) nil)))
           (should-not (mega-trust-p dir t))
           (should-not (mega-trust-p dir t))
           (should (= asked 1))

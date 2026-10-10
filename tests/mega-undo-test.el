@@ -369,6 +369,11 @@ that two states are equal, were it ever false, must not make it happen."
     (should (eq (current-buffer) buffer))
     (should (equal (buffer-string) "a"))))
 
+(ert-deftest mega-undo-tree-quits-on-q-whichever-way-it-is-typed ()
+  "Reported from use: with the shift key down nothing happened."
+  (dolist (key '("q" "Q" "RET"))
+    (should (eq (lookup-key mega-undo-tree-mode-map (kbd key)) 'mega-undo-tree-quit))))
+
 (ert-deftest mega-undo-tree-refuses-where-undoing-would-be-wrong ()
   (with-temp-buffer
     (buffer-enable-undo)

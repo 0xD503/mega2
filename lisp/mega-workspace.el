@@ -318,7 +318,7 @@ Returns the workspace, or nil if no file was open."
 (defun mega-workspace-forget (name)
   "Forget the stored workspace called NAME.  Open files are not touched."
   (interactive (list (mega-workspace--read-name "Forget workspace: ")))
-  (when (yes-or-no-p (format "Forget the saved workspace %s? " name))
+  (when (mega-confirm (format "Forget the saved workspace %s? " name))
     (mega-workspace-delete name)
     (message "Forgot workspace %s" name)))
 

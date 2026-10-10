@@ -38,7 +38,8 @@ emacs --init-directory ~/.mega2.d      # anywhere else
 
 Without a file, Emacs opens on a home page: `r` continues where you left off,
 `1`–`9` open a recent project, and the first line says how long starting
-took, up to the moment the page was drawn.
+took, up to the moment the page was drawn. `C-n` and `C-p` go from one
+choice to the next, and `RET` takes the one that is marked.
 
 Then, once:
 
@@ -164,6 +165,11 @@ MEGA never asks while you open or read a file. It asks only when you press
 a key that cannot work without the answer, such as build or debug, and says
 what the answer allows. A file outside any project is trusted with the other
 files of its directory and nothing below it.
+
+That question takes the word `yes`, typed out: one key is pressed too easily
+to let a project run its code. So do the others whose yes weighs as much:
+starting or removing a container, sending text from a private file to
+Claude, downloading parsers, and deleting what MEGA has stored.
 
 ## Where a setting goes
 

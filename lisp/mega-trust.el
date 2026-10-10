@@ -152,7 +152,7 @@ or a process filter must not ask: see the Commentary."
             (not noninteractive)
             (let* ((directory (expand-file-name (or directory default-directory)))
                    (root (mega-trust-root directory))
-                   (answer (y-or-n-p
+                   (answer (mega-confirm
                             (format "Trust %s?  MEGA wants to %s, which can run code from it. "
                                     root (or why "run its tools")))))
               (mega-trust--record

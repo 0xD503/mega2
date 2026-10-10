@@ -15,7 +15,7 @@
 ;;   b / f   back to the older state / forward to the newer one
 ;;   p / n   the other branches of the same fork
 ;;   a / e   the start / the end of this branch
-;;   RET, q  keep the text as it is now
+;;   RET, q  keep the text as it is now (Q does the same)
 ;;   C-g     put the text back the way it was when you pressed C-x u
 ;;
 ;; Nothing here has a history of its own.  The tree is read off Emacs's own
@@ -477,6 +477,8 @@ that node, or `origin'; LAST-CONS is the last cons the list had.")
                        ("a" . mega-undo-tree-branch-start) ("C-a" . mega-undo-tree-branch-start)
                        ("e" . mega-undo-tree-branch-end) ("C-e" . mega-undo-tree-branch-end)
                        ("RET" . mega-undo-tree-quit) ("q" . mega-undo-tree-quit)
+                       ;; With the shift key down, or the lock on, as well.
+                       ("Q" . mega-undo-tree-quit)
                        ("C-g" . mega-undo-tree-cancel)))
       (define-key map (kbd (car binding)) (cdr binding)))
     map)

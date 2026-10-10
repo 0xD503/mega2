@@ -446,8 +446,65 @@ what Emacs calls init: that part ends before the hook has run."
       (should (get-file-buffer a)))))
 
 (ert-deftest mega-home-every-key-on-the-page-is-bound ()
-  (dolist (key '("r" "1" "9" "f" "p" "w" "?" "d" "g" "q" "RET"))
+  (dolist (key '("r" "1" "9" "f" "p" "w" "?" "d" "g" "q" "RET"
+                 "C-n" "C-p" "<down>" "<up>" "TAB" "<backtab>"))
     (should (commandp (lookup-key mega-home-mode-map (kbd key))))))
+
+(defun mega-workspace-test--marked ()
+  "The text of the line the home page marks, or nil if it marks none."
+  (and (overlayp mega-home--current)
+       (< (overlay-start mega-home--current) (overlay-end mega-home--current))
+       (string-trim (buffer-substring-no-properties
+                     (overlay-start mega-home--current)
+                     (overlay-end mega-home--current)))))
+
+(ert-deftest mega-home-moving-goes-from-one-choice-to-the-next ()
+  "C-n and C-p stop only where RET does something, and say where that is."
+  (mega-test-with-directory second
+    (mega-workspace-test--home (list dir second)
+      (let ((a (mega-test-write (expand-file-name "a.txt" dir) "alpha" ""))
+            (opened nil))
+        (mega-workspace-write (list :name "last" :automatic t :saved 1.0
+                                    :files (list (list a 3))))
+        (cl-letf (((symbol-function 'mega-home-open-project)
+                   (lambda (root) (push root opened)))
+                  ((symbol-function 'mega-home-continue)
+                   (lambda () (push 'continue opened))))
+          (with-current-buffer (mega-home-render)
+            ;; The page opens with the first choice marked: the last session.
+            (should (string-prefix-p "r " (mega-workspace-test--marked)))
+            (mega-home-next)
+            (should (string-prefix-p "1 " (mega-workspace-test--marked)))
+            (mega-home-act)
+            (should (equal opened (list dir)))
+            (mega-home-next)
+            (should (string-prefix-p "2 " (mega-workspace-test--marked)))
+            (mega-home-act)
+            (should (equal (car opened) second))
+            ;; Past the last comes the first, and before it the last again.
+            (mega-home-next)
+            (should (string-prefix-p "r " (mega-workspace-test--marked)))
+            (mega-home-previous)
+            (should (string-prefix-p "2 " (mega-workspace-test--marked)))
+            (mega-home-previous 2)
+            (should (string-prefix-p "r " (mega-workspace-test--marked)))
+            (mega-home-act)
+            (should (eq (car opened) 'continue))
+            ;; A line that offers nothing is not marked, wherever the cursor
+            ;; was put; the next move finds a choice again.
+            (goto-char (point-min))
+            (run-hooks 'post-command-hook)
+            (should-not (mega-workspace-test--marked))
+            (mega-home-next)
+            (should (string-prefix-p "r " (mega-workspace-test--marked)))))))))
+
+(ert-deftest mega-home-moving-with-nothing-to-choose-does-no-harm ()
+  (mega-workspace-test--home nil
+    (with-current-buffer (mega-home-render)
+      (mega-home-next)
+      (mega-home-previous)
+      (should-not (mega-workspace-test--marked))
+      (should-error (mega-home-act) :type 'user-error))))
 
 (ert-deftest mega-home-is-read-only-and-opens-nothing-by-itself ()
   (mega-workspace-test--home (list dir)

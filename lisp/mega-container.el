@@ -435,7 +435,7 @@ never agrees."
              (save-window-excursion
                (pop-to-buffer (mega-container--show
                                (mega-container-summary plan cli others)))
-               (yes-or-no-p (format "Start this container, as %s describes? "
+               (mega-confirm (format "Start this container, as %s describes? "
                                     (abbreviate-file-name file))))
              (let ((temporary (concat mega-container-approved-file ".new")))
                (setf (alist-get file approved nil nil #'equal) hash)
@@ -913,7 +913,7 @@ The container itself is left running."
     (let* ((entry (or (mega-container-attached)
                       (user-error "This project is not using a container")))
            (attached (cdr entry)))
-      (when (yes-or-no-p (format "Stop the container of %s? " (plist-get attached :name)))
+      (when (mega-confirm (format "Stop the container of %s? " (plist-get attached :name)))
         (mega-container--ok (plist-get attached :engine)
                             (list "stop" (plist-get attached :id)) :timeout 60)
         (setq mega-container--attached (delq entry mega-container--attached))
@@ -930,7 +930,7 @@ Volumes are kept."
                      (user-error "Neither podman nor docker is installed")))
          (existing (mega-container-find-existing engine root)))
     (when (and existing
-               (yes-or-no-p "Remove this project's container and start a new one? "))
+               (mega-confirm "Remove this project's container and start a new one? "))
       (mega-container--ok engine (list "rm" "--force" (car existing)) :timeout 60)
       (setq mega-container--attached
             (assoc-delete-all root mega-container--attached)))

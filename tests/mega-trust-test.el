@@ -87,6 +87,7 @@
           (noninteractive nil))
       (cl-letf (((symbol-function 'y-or-n-p) (lambda (&rest _) (setq asked t) nil))
                 ((symbol-function 'yes-or-no-p) (lambda (&rest _) (setq asked t) nil))
+                ((symbol-function 'mega-confirm) (lambda (&rest _) (setq asked t) nil))
                 ;; Every server is "installed": the worst case.
                 ((symbol-function 'mega-exec-find) (lambda (&rest _) t))
                 ;; Emacs's offer to build a parser is a question too, but

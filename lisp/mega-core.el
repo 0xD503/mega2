@@ -175,7 +175,7 @@ Settings that are there already are kept."
 
 ;;;; General behaviour
 
-(setq use-short-answers t                  ; y/n instead of yes/no
+(setq use-short-answers t                  ; Emacs's own; see `mega-confirm'
       ring-bell-function #'ignore
       visible-bell nil
       ;; Quitting still asks about unsaved buffers and running processes;
