@@ -417,9 +417,7 @@ See the Commentary of mega-search.el for the keys of the prompt."
     (unless mega-search--backend
       (user-error "No search program found: install ripgrep, or use this in a git repository"))
     (let ((choice (mega-pick-read
-                   (format "Search %s with %s: "
-                           (file-name-nondirectory (directory-file-name directory))
-                           (mega-search-backend-name mega-search--backend))
+                   (mega-search-prompt directory mega-search--backend)
                    #'mega-search-run
                    :category 'mega-search
                    :initial initial
@@ -429,6 +427,15 @@ See the Commentary of mega-search.el for the keys of the prompt."
              (mega-search-results-buffer choice directory mega-search--backend))
             ((mega-search-visit choice directory))
             (t (message "No hit chosen"))))))
+
+(defun mega-search-prompt (directory backend)
+  "What the prompt says for a search of DIRECTORY with BACKEND.
+Which project, which program, and where the settings are: the keys that
+change them mean something only while this prompt is open, and there
+is nowhere else to learn that at the moment it matters."
+  (format "Search %s with %s (C-o ? for options): "
+          (file-name-nondirectory (directory-file-name directory))
+          (mega-search-backend-name backend)))
 
 ;;;###autoload
 (defun mega-search-symbol ()

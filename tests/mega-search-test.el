@@ -439,7 +439,7 @@ holds each to what the table says of it."
         (cl-letf (((symbol-function 'mega-pick-read)
                    (lambda (prompt &rest _) (setq asked prompt) "")))
           (mega-search-project))
-        (should (string-match-p " with grep: \\'" asked))))))
+        (should (string-match-p " with grep (C-o \\? for options): \\'" asked))))))
 
 (ert-deftest mega-search-submodules-or-untracked-files-never-both ()
   "As the user's own aliases have it: gs searches submodules, g does not.
@@ -582,6 +582,19 @@ And git refuses --recurse-submodules together with --untracked."
         (mega-search-symbol)
         (should (equal started (regexp-quote (thing-at-point 'symbol t))))
         (should (string-match-p "\\\\" started))))))
+
+(ert-deftest mega-search-the-prompt-says-where-its-settings-are ()
+  "Reported from use: C-o, pressed where the guide did not say it had to be,
+opened a line.  The keys are the prompt's, and the prompt is where to say so."
+  (let ((prompt (mega-search-prompt "/home/u/src/proj/" 'git)))
+    (should (equal prompt "Search proj with git grep (C-o ? for options): "))
+    ;; What it names is what the prompt really has.
+    (should (eq (lookup-key mega-search-map (kbd "C-o ?"))
+                'mega-search-show-settings)))
+  (should (string-match-p "with ripgrep (C-o"
+                          (mega-search-prompt "/home/u/src/proj" 'rg)))
+  ;; Outside the prompt MEGA leaves the key to Emacs.
+  (should-not (lookup-key mega-keys-mode-map (kbd "C-o"))))
 
 (provide 'mega-search-test)
 ;;; mega-search-test.el ends here

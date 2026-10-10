@@ -534,7 +534,8 @@ is more settings, each NAME=VALUE."
             (mega-compile--made nil))
         (with-temp-buffer
           (mega-compile--doctor)
-          (should (string-match-p "none yet: made in the background" (buffer-string))))
+          (should (string-match-p "none yet: made when Emacs has three idle seconds, or by M-x mega-compile-now"
+                                  (buffer-string))))
         (let ((mega-compile nil))
           (with-temp-buffer
             (mega-compile--doctor)

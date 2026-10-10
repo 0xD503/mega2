@@ -59,11 +59,13 @@ C-c ?                every MEGA key, and the keys of each place that has its own
 ```
 
 **MEGA compiles itself.** There is nothing to do. The first start after an
-update runs MEGA's Lisp as source and, a few seconds later, compiles a copy
-in the background. Every start after that loads the copy, and Emacs turns
-what it loads into native code by itself, also in the background. The copy
-lives in `~/.cache/mega2`; nothing compiled is ever written to `~/.mega2.d`,
-which is to say into this repository. `M-x mega-doctor` says which form is running.
+update runs MEGA's Lisp as source; the first time Emacs then has three
+seconds with nothing to do, it compiles a copy in the background. Every
+start after that loads the copy, and Emacs turns what it loads into native
+code by itself, also in the background. The copy lives in `~/.cache/mega2`;
+nothing compiled is ever written to `~/.mega2.d`, which is to say into this
+repository. `M-x mega-doctor` says which form is running, under "MEGA's own
+Lisp", and `M-x mega-compile-now` makes the copy at once, for the next start.
 
 ## Keys
 
@@ -127,17 +129,21 @@ below, and `C-c g b` sets breakpoints before you start; that needs lldb's
 adapter (`lldb-dap`) or gdb 14 or newer in the container.
 
 **Searching** (`M-g a`) is done by `git grep`, as a Perl regular expression,
-and the prompt says so. `C-o b` switches to ripgrep, then plain grep, then
-back, and the session stays with what you chose; `(setq mega-search-backend
-'rg)` in `local.el` makes ripgrep the one to start with. Outside a checkout
-`git grep` cannot search, and the next of the three that is installed does.
+and the prompt says so. Outside a checkout `git grep` cannot search, and the
+next of git grep, ripgrep and grep that is installed does.
 
-`C-o ?` shows the settings and `C-o` plus a letter changes one: `c` case,
-`w` whole words, `l` literal text, `e` export the hits to an editable buffer.
-`needle -- src/*.rs` searches part of the project.
+How it searches is changed in that prompt, while it is open and you are
+typing what to look for: `C-o` and then a letter. (Anywhere else `C-o` is
+Emacs's own key and opens a line.) `C-o ?` shows the settings; `C-o c`
+changes case, `w` whole words, `l` literal text, `e` exports the hits to an
+editable buffer. `C-o b` switches to ripgrep, then plain grep, then back,
+and the session stays with what you chose; `(setq mega-search-backend 'rg)`
+in `local.el` makes ripgrep the one to start with. `needle -- src/*.rs`
+searches part of the project.
 
 Which files are searched is where the three programs differ, since only git
-knows what a checkout tracks. In brackets, how each starts out:
+knows what a checkout tracks. These too are keys of the search prompt; in
+brackets, how each starts out:
 
 | | git grep | ripgrep | grep |
 | --- | --- | --- | --- |

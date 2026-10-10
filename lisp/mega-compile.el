@@ -318,7 +318,7 @@ next."
            ((and failure (equal (car failure) (mega-fingerprint mega-lisp-dir)))
             "could not be made from this source")
            ((not mega-compile) "none, and none is made: `mega-compile' is nil")
-           (t "none yet: made in the background, a few seconds after starting"))
+           (t "none yet: made when Emacs has three idle seconds, or by M-x mega-compile-now"))
      (and failure (not mega-compiled-p) 'error))
     (when (and failure (not mega-compiled-p)
                (equal (car failure) (mega-fingerprint mega-lisp-dir)))
