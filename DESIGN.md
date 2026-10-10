@@ -336,6 +336,7 @@ its top is what Emacs is pointed at.
 | — | MEGA compiles itself: a compiled copy in the cache, made in the background, native through Emacs's JIT (requested after the review) | done |
 | — | A repository of its own, out of the dotfiles it grew up in; its history came along | done |
 | — | Architecture review, 37 findings: trust as an act and not a prompt, Emacs's own launch points gated, one process layer with three places, one rule for what leaves no trace, the two tables, tests over the wire, the bench rebuilt | done |
+| — | First use, round one (reported by its user): a yes that really builds the parser; fd for listing files; choices on the home page; the word yes for what weighs; who changed a line; which block you are in; MEGA as a bare copy in `~/.emacs.d` | done |
 
 Each milestone ends with its unit tests, doctor rows and guide entries.
 
