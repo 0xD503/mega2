@@ -257,6 +257,27 @@ on in one buffer."
 
 (add-hook 'find-file-hook #'mega-edit--blame)
 
+;;;; The block you are in
+;;
+;; The mode itself is in mega-context.el and loads with the first code
+;; buffer.
+
+(defcustom mega-context t
+  "Whether code shows, above the text, the lines that open the blocks around
+the cursor once they are out of sight.
+Nil switches that off everywhere; `M-x mega-context-mode' still turns it
+on in one buffer."
+  :type 'boolean :group 'mega)
+
+(autoload 'mega-context-mode "mega-context" nil t)
+
+(defun mega-edit--context ()
+  "Turn `mega-context-mode' on in a buffer of code, unless that is not wanted."
+  (when mega-context
+    (mega-context-mode 1)))
+
+(add-hook 'prog-mode-hook #'mega-edit--context)
+
 ;;;; Typing conveniences, all from Emacs itself
 
 (delete-selection-mode 1)

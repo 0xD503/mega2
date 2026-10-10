@@ -81,6 +81,7 @@
                             mega-task-choose mega-task-again mega-task-stop))
     (mega-indent-guides :commands (mega-indent-guides-mode))
     (mega-blame  :commands (mega-blame-mode))
+    (mega-context :commands (mega-context-mode))
     (mega-undo-tree :commands (mega-undo-tree))
     (mega-debug  :commands (mega-debug mega-debug-run
                             mega-debug-break mega-debug-remove

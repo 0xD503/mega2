@@ -175,6 +175,7 @@ project shell; editable grep results; GUD debuggers (gdb, lldb, pdb).
 | Debug adapter client | Own client for the Debug Adapter Protocol: breakpoints that outlive sessions, stack, variables, output |
 | Workspaces | The open files and the window layout, saved under a name and resumed |
 | Small helpers | Indent guides, TODO highlight, symbol jump, trim changed lines, clipboard bridge |
+| Which block you are in | A line above the text names the lines that open the blocks around the cursor, once they are out of sight, and goes away when they are not. From indentation alone: the nearest line above that is indented less, and so on outward. Comments, the inside of strings, and in C the preprocessor and labels are passed over; a line that only closes a list of arguments gives way to the line that began it |
 | Who changed this line | At the end of the line the cursor rests on: who, how long ago, in which change. git is asked about that one line when Emacs is idle, in the background, about the text on screen whether saved or not, and with `--no-textconv`, without which it runs a converter the repository can name |
 | Modes | Markdown, Zig, justfile, Rust fallback |
 

@@ -380,6 +380,59 @@ terminal was sent."
       (error (mega-terminal-probe--problem
               "the note on who changed a line failed: %S" err)))))
 
+(defun mega-terminal-probe--context ()
+  "Check, on the live terminal, the line that says which block the cursor is in.
+The function it is in begins sixty lines above the top of the window,
+and is never on screen itself: so if its name reaches the terminal, it
+was drawn in the line above the text.  The runner looks for that."
+  (defvar mega-context-mode)
+  (defvar mega-context--format)
+  (declare-function mega-context-refresh "mega-context")
+  (declare-function mega-rust-mode "mega-mode-rust")
+  (condition-case err
+      (save-window-excursion
+        (delete-other-windows)
+        (switch-to-buffer (get-buffer-create "mega-probe-context"))
+        (insert "impl Probe {\n    fn megaprobecontext(&self) {\n")
+        (dotimes (n 80)
+          (insert (format "        step(%d);\n" n)))
+        (insert "    }\n}\n")
+        ;; Not through a file: Emacs would offer to build a parser for it.
+        (mega-rust-mode)
+        (unless (bound-and-true-p mega-context-mode)
+          (mega-terminal-probe--problem "code does not get the line that says which block it is"))
+        (goto-char (point-min))
+        (forward-line 62)
+        (set-window-start (selected-window) (line-beginning-position))
+        ;; The cursor well inside the window, so that nothing but the line
+        ;; above the text could give Emacs a reason to scroll.
+        (forward-line 8)
+        (redisplay t)
+        (let ((top (window-start)))
+          (mega-context-refresh)
+          (redisplay t)
+          (let ((line (and (eq header-line-format mega-context--format)
+                           (format-mode-line header-line-format))))
+            (cond ((not (and line
+                             (string-match-p "impl Probe . fn megaprobecontext(&self)"
+                                             line)))
+                   (mega-terminal-probe--problem
+                    "the line above the text does not name the block: %S" line))
+                  ((/= top (window-start))
+                   (mega-terminal-probe--problem
+                    "showing the line above the text moved the text"))))
+          ;; Back where the function begins, the line has nothing to add.
+          (goto-char (point-min))
+          (set-window-start (selected-window) (point-min))
+          (mega-context-refresh)
+          (redisplay t)
+          (when header-line-format
+            (mega-terminal-probe--problem
+             "the line above the text stays when everything is on screen")))
+        (kill-buffer))
+    (error (mega-terminal-probe--problem
+            "the line that says which block the cursor is in failed: %S" err))))
+
 (defun mega-terminal-probe--form ()
   "Check that MEGA's Lisp runs in the form MEGA_TEST_FORM names.
 \"compiled\": from a compiled copy that was there.  \"make\": from source,
@@ -493,6 +546,7 @@ copy as native code.  Anything else: from source."
   (mega-terminal-probe--completion)
   (mega-terminal-probe--undo)
   (mega-terminal-probe--blame)
+  (mega-terminal-probe--context)
   (mega-terminal-probe--processes)
   (mega-terminal-probe--untrusted)
   (when (and (equal (getenv "MEGA_TEST_LAUNCHER") "chemacs")

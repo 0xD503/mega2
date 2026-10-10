@@ -88,6 +88,14 @@ In code, `C-c C-c` comments or uncomments, `C-c f` folds the block the cursor
 is in (`C-c F`: all of them), and `M-n` / `M-p` jump between the uses of the
 symbol at point.
 
+**Which block you are in.** When the line that opens the function, class or
+block around the cursor has scrolled off the top, a line above the text
+shows it, outermost first: `impl Parser › fn statement › match self.peek()`.
+It is worked out from indentation, so it needs no parser and works in any
+language whose code is indented; when everything is on screen the line goes
+away. `M-x mega-context-mode` switches it off in a buffer, `(setq
+mega-context nil)` in `local.el` everywhere.
+
 **Who changed this line.** In a file that git keeps, the line the cursor
 rests on says at its end who changed it last, how long ago and in which
 change; a line you have changed since says `not committed yet`. `M-x

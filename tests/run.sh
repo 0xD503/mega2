@@ -442,6 +442,16 @@ terminal_run() {
         rc=1
     fi
 
+    # And which block the cursor is in: the function the probe puts it in
+    # begins above the top of the window, so its name can only have come
+    # from the line above the text.
+    if [ "$T_EXPECT" = supported ] && [ -f "$MEGA_TEST_REPORT" ] &&
+        ! grep -q 'megaprobecontext' "$SANDBOX/screen"; then
+        printf 'problem: the block the cursor is in was never drawn on the terminal\n' \
+            >> "$MEGA_TEST_REPORT"
+        rc=1
+    fi
+
     if [ ! -f "$MEGA_TEST_REPORT" ]; then
         bad "$label: no report (exit $rc); Emacs did not finish starting"
     elif [ "$rc" -ne 0 ] || ! grep -q '^verdict=ok$' "$MEGA_TEST_REPORT" ||
