@@ -138,6 +138,7 @@ Everything outside Emacs is optional: without it the feature stays quiet and
 | For | Install |
 | --- | --- |
 | Search | `git` in a checkout; `rg` or `grep` anywhere else |
+| Finding files | `git` in a checkout; `fd` (also under the name `fdfind`), `rg` or `find` anywhere else |
 | Go to definition, rename, problems as you type | the language's server, e.g. `rust-analyzer`, `clangd` |
 | Format on save | the language's formatter, e.g. `rustfmt`, `clang-format`, `ruff` |
 | Debugging | `lldb` or `gdb`; Python brings `pdb` |

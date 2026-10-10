@@ -124,7 +124,14 @@
       (set-file-modes tool #o755)
       (let ((report (mega-doctor-test--report)))
         (should (string-match-p (concat "rg +" (regexp-quote tool)) report))
-        (should (string-match-p "git +not found" report))))))
+        (should (string-match-p "git +not found" report))
+        ;; A program that goes by two names is looked for under both.
+        (should (string-match-p "fd +not found (as fdfind or fd)" report)))
+      (let ((tool (mega-test-write (expand-file-name "fdfind" dir) "#!/bin/sh" ""))
+            (mega--exe-cache (make-hash-table :test #'equal)))
+        (set-file-modes tool #o755)
+        (should (string-match-p (concat "fd +" (regexp-quote tool))
+                                (mega-doctor-test--report)))))))
 
 (ert-deftest mega-doctor-runs-no-program-and-opens-no-connection ()
   "It reports; it never installs, connects or executes."

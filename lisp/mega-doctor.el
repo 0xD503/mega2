@@ -25,8 +25,10 @@
 (defvar package-archives)
 (defvar package--initialized)
 
-(defconst mega-doctor-tools '("git" "rg" "cc")
-  "Optional programs the base reports on.  Feature modules report their own.")
+(defconst mega-doctor-tools '("git" ("fd" "fdfind" "fd") "rg" "cc")
+  "Optional programs the base reports on.  Feature modules report their own.
+An entry is the name of a program, or (LABEL NAME...) for one that goes
+by more than one name: the first of them that exists is shown.")
 
 (defvar mega-doctor--lazy nil
   "What became of each module that loads on first use: (MODULE . STATE).
@@ -141,9 +143,17 @@ Every row is read from the running Emacs, not asserted."
   "Insert the section listing optional programs."
   (mega-doctor-heading "Optional programs")
   (dolist (tool mega-doctor-tools)
-    (let ((path (mega-exe-p tool)))
-      (mega-doctor-row tool (or path "not found") (unless path 'shadow))))
-  (insert "\n  None of these is required; a feature that wants one says so.\n"))
+    (let* ((names (if (consp tool) (cdr tool) (list tool)))
+           (path (seq-some #'mega-exe-p names)))
+      (mega-doctor-row (if (consp tool) (car tool) tool)
+                       (cond (path)
+                             ((cdr names)
+                              (format "not found (as %s)" (string-join names " or ")))
+                             (t "not found"))
+                       (unless path 'shadow))))
+  (insert "\n  None of these is required; a feature that wants one says so.\n"
+          "  Outside a checkout, fd lists a project's files; without it ripgrep\n"
+          "  does, and without that, find.\n"))
 
 ;;;; The command
 

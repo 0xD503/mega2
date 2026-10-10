@@ -179,32 +179,76 @@ Nil in a checkout, where version control decides, and outside a project."
   "NAME as a glob pattern that matches nothing but NAME."
   (replace-regexp-in-string "[][*?{}!\\]" "\\\\\\&" name))
 
+(defvar mega-project--listers-failed nil
+  "Programs that were tried for listing files, this session, and do not do it.")
+
+(add-hook 'mega-forget-functions
+          (lambda () (setq mega-project--listers-failed nil)))
+
+(defun mega-project-list-commands (root)
+  "Return the commands that can list the files below ROOT, the best first.
+Each is (PROGRAM . ARGS), to be run in ROOT.  The names it prints are
+relative and each ends in a null byte, which is the one thing a file
+name cannot contain.
+
+fd is the program made for this; it goes by fdfind where another
+program had the name before it.  ripgrep does the same on the side.
+Both honour a .gitignore or an .ignore file, if the project has one in
+spite of having no repository.  find is everywhere, and knows nothing
+of either.  All three leave out the directories of
+`mega-project--skipped', and only directories: a file of such a name is
+a file of the project."
+  (let* ((skipped (mapcar #'mega-project--glob-quote (mega-project--skipped)))
+         (usable (lambda (program)
+                   (and (not (member program mega-project--listers-failed))
+                        (mega-exec-find program root t))))
+         (fd (seq-find usable '("fdfind" "fd"))))
+    (delq nil
+          (list
+           (and fd
+                `(,fd "--type" "f" "--hidden" "--no-require-git" "--print0"
+                      "--color" "never"
+                      ,@(mapcan (lambda (name) (list "--exclude" (concat name "/")))
+                                skipped)))
+           (and (funcall usable "rg")
+                `("rg" "--files" "--hidden" "--no-require-git" "--null"
+                  ,@(mapcar (lambda (name) (concat "--glob=!" name "/")) skipped)))
+           `("find" "." "(" "-type" "d" "("
+             ,@(cdr (mapcan (lambda (name) (list "-o" "-name" name)) skipped))
+             ")" ")" "-prune" "-o" "-type" "f" "-print0")))))
+
 (defun mega-project-list-command (root)
-  "Return (PROGRAM . ARGS) that lists the files below ROOT, run there.
-The names are relative and each ends in a null byte, which is the one
-thing a file name cannot contain."
-  (let ((skipped (mapcar #'mega-project--glob-quote (mega-project--skipped))))
-    (if (mega-exec-find "rg" root t)
-        ;; ripgrep also honours a .gitignore or an .ignore file, if the
-        ;; project has one in spite of having no repository.
-        `("rg" "--files" "--hidden" "--no-require-git" "--null"
-          ,@(mapcar (lambda (name) (concat "--glob=!" name "/")) skipped))
-      `("find" "." "("
-        ,@(cdr (mapcan (lambda (name) (list "-o" "-name" name)) skipped))
-        ")" "-prune" "-o" "-type" "f" "-print0"))))
+  "Return the command the files below ROOT are listed with.
+See `mega-project-list-commands', of which it is the first."
+  (car (mega-project-list-commands root)))
 
 (defun mega-project-list-files (root)
   "The files of the project without version control at ROOT, in order.
 The names are absolute.  Reading a project runs none of its code, so
 this needs no trust."
   (let* ((root (file-name-as-directory (expand-file-name root)))
-         (command (mega-project-list-command root))
-         (result (mega-exec-run (car command) (cdr command)
-                                :directory root :local t
-                                :timeout mega-project-list-timeout)))
-    (when (plist-get result :stopped)
-      (error "Listing the files of %s took more than %s seconds"
-             (abbreviate-file-name root) mega-project-list-timeout))
+         (commands (mega-project-list-commands root))
+         result)
+    (while (and commands (not result))
+      (let* ((command (pop commands))
+             (tried (mega-exec-run (car command) (cdr command)
+                                   :directory root :local t
+                                   :timeout mega-project-list-timeout)))
+        (cond
+         ;; Installed, and it does not do this: a version from before an
+         ;; option used here, or another program that has the name, which
+         ;; `fd' is on some systems.  It said nothing useful, so nothing
+         ;; is lost by asking the next one, for the rest of the session.
+         ((and commands
+               (string-empty-p (or (plist-get tried :output) ""))
+               (or (plist-get tried :stopped)
+                   (and (not (eql (plist-get tried :status) 0))
+                        (not (string-empty-p (or (plist-get tried :error) ""))))))
+          (push (car command) mega-project--listers-failed))
+         ((plist-get tried :stopped)
+          (error "Listing the files of %s took more than %s seconds"
+                 (abbreviate-file-name root) mega-project-list-timeout))
+         (t (setq result tried)))))
     (sort (mapcar (lambda (name)
                     (concat root (if (string-prefix-p "./" name)
                                      (substring name 2)

@@ -116,18 +116,77 @@
   (mega-test-with-directory dir
     (mega-project-test--unpacked dir)
     (should (equal (mega-project-test--files dir) mega-project-test--expected))
-    ;; The same without ripgrep.
-    (cl-letf (((symbol-function 'mega-exec-find)
-               (lambda (program &rest _) (equal program "find"))))
-      (should (equal (car (mega-project-list-command dir)) "find"))
-      (should (equal (mega-project-test--files dir) mega-project-test--expected)))
+    ;; The same with each program that can do it, whichever are installed.
+    (dolist (finder '("fdfind" "fd" "rg" "find"))
+      (when (executable-find finder)
+        (cl-letf (((symbol-function 'mega-exec-find)
+                   (lambda (program &rest _) (equal program finder))))
+          (ert-info ((format "listed by %s" finder))
+            (should (equal (car (mega-project-list-command dir)) finder))
+            (should (equal (mega-project-test--files dir)
+                           mega-project-test--expected))))))
     ;; What is left out is yours to say.
     (let ((mega-project-ignored-directories '("notes")))
       (should (member "target/CACHEDIR.TAG" (mega-project-test--files dir)))
       (should-not (member "notes/target.txt" (mega-project-test--files dir))))))
 
+(ert-deftest mega-project-the-best-program-there-is-lists-the-files ()
+  "fd, under either of its names; then ripgrep; then find, which is everywhere."
+  (dolist (case '((("fdfind" "fd" "rg" "find") . "fdfind")
+                  (("fd" "rg" "find") . "fd")
+                  (("rg" "find") . "rg")
+                  (("find") . "find")))
+    (let ((mega-project--listers-failed nil))
+      (cl-letf (((symbol-function 'mega-exec-find)
+                 (lambda (program &rest _) (member program (car case)))))
+        (should (equal (car (mega-project-list-command "/project/")) (cdr case)))
+        ;; And never in a way that could be taken for an option or a pattern.
+        (dolist (command (mega-project-list-commands "/project/"))
+          (should (seq-every-p #'stringp command)))))))
+
+(ert-deftest mega-project-a-program-that-does-not-list-is-passed-over ()
+  "An old version without an option used here, or another program of that name."
+  (mega-test-with-directory dir
+    (mega-project-test--unpacked dir)
+    (dolist (failure (list (list :status 2 :output "" :error "unexpected argument")
+                           (list :status nil :output "" :error "" :stopped 'timeout)))
+      (let ((mega-project--listers-failed nil)
+            (run (symbol-function 'mega-exec-run))
+            (ran nil))
+        (cl-letf (((symbol-function 'mega-exec-find)
+                   (lambda (program &rest _) (member program '("fd" "find"))))
+                  ((symbol-function 'mega-exec-run)
+                   (lambda (program &rest arguments)
+                     (push program ran)
+                     (if (equal program "fd")
+                         failure
+                       (apply run program arguments)))))
+          (should (equal (mega-project-test--files dir) mega-project-test--expected))
+          (should (equal (reverse ran) '("fd" "find")))
+          ;; Once is enough: it is not tried again in this session...
+          (should (equal (mega-project-test--files dir) mega-project-test--expected))
+          (should (equal (reverse ran) '("fd" "find" "find")))
+          ;; ...until you say that what is installed has changed.
+          (mega-forget-executables)
+          (should-not mega-project--listers-failed))))))
+
+(ert-deftest mega-project-a-file-named-like-a-left-out-directory-is-listed ()
+  "What is left out is directories: a script called build is a file of yours."
+  (mega-test-with-directory dir
+    (mega-project-test--unpacked dir)
+    (mega-test-write (expand-file-name "tools/target" dir) "#!/bin/sh" "")
+    (dolist (finder '("fdfind" "fd" "rg" "find"))
+      (when (executable-find finder)
+        (cl-letf (((symbol-function 'mega-exec-find)
+                   (lambda (program &rest _) (equal program finder))))
+          (ert-info ((format "listed by %s" finder))
+            (let ((files (mega-project-test--files dir)))
+              (should (member "tools/target" files))
+              (should-not (member "target/CACHEDIR.TAG" files)))))))))
+
 (ert-deftest mega-project-files-without-version-control-honour-an-ignore-file ()
-  (skip-unless (executable-find "rg"))
+  (skip-unless (or (executable-find "fdfind") (executable-find "fd")
+                   (executable-find "rg")))
   (mega-test-with-directory dir
     (mega-project-test--unpacked dir)
     (mega-test-write (expand-file-name ".gitignore" dir) "notes/" "")
@@ -142,7 +201,7 @@
   (mega-test-with-directory dir
     (mega-project-test--unpacked dir)
     (mega-test-write (expand-file-name "{arch}/log" dir) "x" "")
-    (dolist (finder '("rg" "find"))
+    (dolist (finder '("fdfind" "fd" "rg" "find"))
       (when (executable-find finder)
         (cl-letf (((symbol-function 'mega-exec-find)
                    (lambda (program &rest _) (equal program finder))))
