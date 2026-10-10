@@ -4,7 +4,7 @@
 
 ;; Not an ERT file, and not run unless asked for:
 ;;
-;;   MEGA_REAL_IMAGE=some/image:tag tests/test_mega2.sh container
+;;   MEGA_REAL_IMAGE=some/image:tag tests/run.sh container
 ;;
 ;; The unit tests meet a container program and two debuggers that are
 ;; scripts written for the purpose.  A script does what its author knew the

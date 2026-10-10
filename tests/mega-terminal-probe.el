@@ -2,7 +2,7 @@
 
 ;;; Commentary:
 
-;; Not an ERT file.  tests/test_mega2.sh starts a real, interactive Emacs in a
+;; Not an ERT file.  tests/run.sh starts a real, interactive Emacs in a
 ;; pseudo-terminal — through `--init-directory', through chemacs2, or with an
 ;; Emacs too old for MEGA — and loads this file with `-l'.  Half a second
 ;; after Emacs has started and gone idle, this looks at the session, writes

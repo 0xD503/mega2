@@ -2,7 +2,7 @@
 
 ;;; Commentary:
 
-;; Loaded first by tests/test_mega2.sh.  It starts MEGA the way Emacs would —
+;; Loaded first by tests/run.sh.  It starts MEGA the way Emacs would —
 ;; early-init.el, then init.el — inside the sandbox the runner prepared, and
 ;; offers the few helpers the test files share.
 ;;
@@ -22,7 +22,7 @@
   (unless (and sandbox
                (file-in-directory-p (expand-file-name "~") sandbox)
                (file-in-directory-p (or (getenv "XDG_STATE_HOME") "/") sandbox))
-    (error "Run the MEGA tests through tests/test_mega2.sh")))
+    (error "Run the MEGA tests through tests/run.sh")))
 
 (defconst mega-test-dir (file-name-directory (or load-file-name buffer-file-name))
   "The directory holding the MEGA 2.0 tests.")
@@ -30,7 +30,7 @@
 (defconst mega-test-config-dir
   (file-name-as-directory
    (expand-file-name (or (getenv "MEGA_TEST_CONFIG")
-                         (expand-file-name "../../.mega2.d" mega-test-dir))))
+                         (expand-file-name ".." mega-test-dir))))
   "The MEGA configuration under test.")
 
 (load (expand-file-name "early-init.el" mega-test-config-dir) nil :nomessage)

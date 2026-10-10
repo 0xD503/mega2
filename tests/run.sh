@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# test_mega2.sh -- tests for MEGA 2.0 (.mega2.d).
+# run.sh -- the tests of MEGA 2.0.
 #
 # Everything runs in a sandbox: $HOME and the XDG directories point into a
 # throwaway directory, so no test reads or writes your real Emacs state.
@@ -8,14 +8,14 @@
 # only when it is asked for by name:
 #
 #   lint      byte-compile every file, with warnings as errors
-#   unit      the ERT suite in tests/mega2/, run against the real init files
+#   unit      the ERT suite in this directory, run against the real init files
 #   boot      start MEGA in batch and check what startup did: no failed
 #             module, no program run, no connection, within the time budget
 #   bench     time what a person waits for (a keystroke, the completion
 #             menu, a search, a save...) against what each is expected to
 #             take; every time is printed, so a slowdown shows before it
 #             fails.  The expected times, and the commit and reason behind
-#             each, are in tests/mega2/mega-bench-history.eld, which also
+#             each, are in tests/mega-bench-history.eld, which also
 #             says what to do when one is exceeded.
 #   terminal  start it for real in a pseudo-terminal: directly, through
 #             chemacs2 if you have it, and with a too-old Emacs if one exists
@@ -27,7 +27,7 @@
 # Afterwards the configuration directory must be exactly as it was: MEGA
 # never writes into it.
 #
-# usage: tests/test_mega2.sh [STAGE...]
+# usage: tests/run.sh [STAGE...]
 #
 #   STAGE              run only these stages (default: the first five)
 #
@@ -47,7 +47,8 @@
 #   MEGA_REAL_IMAGE    for the container stage: an image that is on this
 #                      machine already and holds a C compiler; gdb or lldb
 #                      as well, for the debugger part.  Never downloaded.
-#   MEGA_TEST_CONFIG   the configuration to test          (default: ../.mega2.d)
+#   MEGA_TEST_CONFIG   the configuration to test: a directory that holds
+#                      init.el, early-init.el and lisp/   (default: this repository)
 #   MEGA_TEST_ONLY     a regexp: run only the unit tests whose names match
 #   MEGA_TEST_UNIT_SECONDS  how long the unit stage may take  (default: 300)
 #
@@ -57,8 +58,8 @@
 set -u
 
 REPO=$(cd -- "$(dirname -- "$0")/.." && pwd) || exit 1
-CONFIG=${MEGA_TEST_CONFIG:-$REPO/.mega2.d}
-TESTS="$REPO/tests/mega2"
+CONFIG=${MEGA_TEST_CONFIG:-$REPO}
+TESTS="$REPO/tests"
 EMACS=${EMACS:-emacs}
 BUDGET=${MEGA_STARTUP_BUDGET_MS:-100}
 REAL_HOME=$HOME
@@ -109,9 +110,12 @@ bad()  { printf 'FAIL  %s\n' "$*"; failed=$((failed + 1)); }
 # Print stdin indented, as the detail under a FAIL line.
 detail() { sed 's/^/      /'; }
 
-# A fingerprint of every file in the configuration directory.
+# A fingerprint of every file in the configuration directory.  The
+# configuration is a repository; what git keeps for itself there is git's,
+# and is not looked at.
 fingerprint() {
-    (cd -- "$CONFIG" && find . -type f | LC_ALL=C sort | while IFS= read -r f; do
+    (cd -- "$CONFIG" && find . -path ./.git -prune -o -type f -print |
+        LC_ALL=C sort | while IFS= read -r f; do
         printf '%s %s\n' "$(cksum < "$f")" "$f"
     done)
 }
@@ -505,7 +509,7 @@ stage_terminal() {
 # --- container (only when asked for) ----------------------------------------
 
 # MEGA against a real container program and real debuggers, where the unit
-# tests have stand-ins: tests/mega2/mega-container-probe.el says what and why.
+# tests have stand-ins: tests/mega-container-probe.el says what and why.
 stage_container() {
     image=${MEGA_REAL_IMAGE-}
     if [ -z "$image" ]; then

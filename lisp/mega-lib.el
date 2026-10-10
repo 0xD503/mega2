@@ -11,9 +11,9 @@
 ;; It has four jobs.
 ;;
 ;; 1. Decide where things live.  MEGA treats its own directory as read-only:
-;;    it is a deployed copy of the dotfiles repo, and every mutable byte goes
-;;    to a private XDG directory instead.  That is what lets
-;;    `./update.sh diff' report real drift rather than runtime churn.
+;;    it is a checkout of MEGA's repository, and every mutable byte goes to
+;;    a private XDG directory instead.  That is what lets `git status'
+;;    there show what you changed and nothing that running Emacs did.
 ;;
 ;; 2. Say which files are private, in one place, so that history, recent
 ;;    files, saved places and (later) persistent undo all agree.
@@ -41,7 +41,7 @@ Every choice MEGA offers is a user option in this group, so
   "Directory holding MEGA's own Lisp, as source.")
 
 (defvar mega-dir (file-name-directory (directory-file-name mega-lisp-dir))
-  "MEGA's configuration directory, the deployed copy of `.mega2.d'.
+  "MEGA's configuration directory: a checkout of its repository.
 Nothing is written here at runtime.")
 
 ;;;; Where mutable state lives

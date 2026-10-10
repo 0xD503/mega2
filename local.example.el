@@ -1,11 +1,10 @@
-;;; local.el --- Machine-specific MEGA settings  -*- lexical-binding: t; -*-
+;;; local.example.el --- Machine-specific MEGA settings  -*- lexical-binding: t; -*-
 
 ;;; Commentary:
 
-;; This file is tracked as a stub and left alone by every plain update.sh
-;; command, exactly like .bashrc.local: deploying it would clobber whatever
-;; this machine keeps here, and collecting it would push one machine's
-;; overrides to every other.  `./update.sh local user' installs it once.
+;; Copy this file to local.el, beside it, and keep there what this machine
+;; alone should have.  Git ignores local.el, so an update of MEGA never
+;; touches it, and one machine's settings never travel to another.
 ;;
 ;; It loads BEFORE the modules, because its main job is choosing.  Anything
 ;; that has to run after a module has loaded goes in `with-eval-after-load',
@@ -28,4 +27,4 @@
 
 
 
-;;; local.el ends here
+;;; local.example.el ends here

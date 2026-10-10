@@ -1,0 +1,12 @@
+# Yours: this machine's settings.  Start it from local.example.el.
+/local.el
+
+# Byte- and native-compiled Lisp is built on the machine, never tracked.
+# (MEGA builds its own under ~/.cache/mega2, not here.)
+*.elc
+*.eln
+
+# Editors' litter.
+*~
+\#*\#
+.\#*

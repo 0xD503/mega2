@@ -29,7 +29,7 @@ plain, working Emacs, which is better than a half-loaded configuration.")
   "Directory holding MEGA's own Lisp, as source.")
 
 (defconst mega-dir (file-name-directory (directory-file-name mega-lisp-dir))
-  "MEGA's configuration directory, the deployed copy of `.mega2.d'.
+  "MEGA's configuration directory: a checkout of its repository.
 Nothing is written here at runtime.")
 
 ;;;; Source, or the compiled copy

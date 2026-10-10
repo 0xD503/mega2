@@ -64,7 +64,8 @@ The second file needs a macro of the first while it is compiled."
 
 (ert-deftest mega-compile-nothing-compiled-lies-in-the-configuration ()
   "Not in what is deployed, and so not in the repository it comes from."
-  (should-not (directory-files-recursively mega-dir "\\.el[cn]\\'")))
+  (should-not (directory-files mega-dir nil "\\.el[cn]\\'"))
+  (should-not (directory-files-recursively mega-lisp-dir "\\.el[cn]\\'")))
 
 ;;;; The fingerprint
 
@@ -231,7 +232,11 @@ is more settings, each NAME=VALUE."
           (cache (expand-file-name "xdg/" dir))
           (inhibit-message t)
           target)
-      (copy-directory mega-dir config nil t t)
+      ;; What Emacs loads, and not the repository it lies in.
+      (make-directory config)
+      (dolist (file '("early-init.el" "init.el"))
+        (copy-file (expand-file-name file mega-dir) (expand-file-name file config)))
+      (copy-directory mega-lisp-dir (expand-file-name "lisp/" config) nil t t)
       ;; No copy yet: the source runs.
       (let ((ran (mega-compile-test--start config cache)))
         (should-not (plist-get ran :compiled))

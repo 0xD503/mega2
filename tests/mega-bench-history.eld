@@ -31,7 +31,7 @@
 ;;    the figure held, so the commit that broke it can be searched for:
 ;;
 ;;      git bisect start HEAD <that commit>
-;;      git bisect run env MEGA_BENCH_ONLY='<name>' tests/test_mega2.sh bench
+;;      git bisect run env MEGA_BENCH_ONLY='<name>' tests/run.sh bench
 ;;
 ;; 2. Fixes it, if it can be fixed.  A slowdown that nobody decided on is a
 ;;    bug like any other.
@@ -52,86 +52,86 @@
 ;; history contains.
 
 (("the reference machine: computing"
-  (:ms 84.0 :date "2026-10-10" :commit "ea12a01"
+  (:ms 84.0 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("the reference machine: programs and disk"
-  (:ms 20.5 :date "2026-10-10" :commit "ea12a01"
+  (:ms 20.5 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("first use of a feature: load its module (slowest)"
-  (:ms 2.3 :limit 40 :date "2026-10-10" :commit "ea12a01"
+  (:ms 2.3 :limit 40 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("type 1000 characters in code"
-  (:ms 26 :date "2026-10-10" :commit "ea12a01"
+  (:ms 26 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("type 1000 characters in Rust, each one highlighted"
-  (:ms 97 :date "2026-10-10" :commit "ea12a01"
+  (:ms 97 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("modeline: what MEGA works out for it, 5000 times"
-  (:ms 12.7 :date "2026-10-10" :commit "ea12a01"
+  (:ms 12.7 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("completion menu: choose from 5000 candidates"
-  (:ms 3.6 :date "2026-10-10" :commit "ea12a01"
+  (:ms 3.6 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("completion menu: draw it 300 times"
-  (:ms 17 :date "2026-10-10" :commit "ea12a01"
+  (:ms 17 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("project files: list 3000, pass over 3000 built ones"
-  (:ms 7.6 :date "2026-10-10" :commit "ea12a01"
+  (:ms 7.6 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("narrow 100,000 file names at the prompt (Emacs's flex)"
-  (:ms 165 :date "2026-10-10" :commit "ea12a01"
+  (:ms 165 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("search: show 2000 hits"
-  (:ms 5.3 :date "2026-10-10" :commit "ea12a01"
+  (:ms 5.3 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("search: a real one, 300 files, with grep"
-  (:ms 4.6 :date "2026-10-10" :commit "ea12a01"
+  (:ms 4.6 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("run a program and wait for it, ten times"
-  (:ms 7 :date "2026-10-10" :commit "ea12a01"
+  (:ms 7 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("copy to and paste from the clipboard, ten times"
-  (:ms 22 :date "2026-10-10" :commit "ea12a01"
+  (:ms 22 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("format a 2000-line buffer on save"
-  (:ms 5 :date "2026-10-10" :commit "ea12a01"
+  (:ms 5 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("open 4000 lines, highlighted: mega-rust-mode"
-  (:ms 104 :date "2026-10-10" :commit "ea12a01"
+  (:ms 104 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("open 4000 lines, highlighted: mega-zig-mode"
-  (:ms 99 :date "2026-10-10" :commit "ea12a01"
+  (:ms 99 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("open 4000 lines, highlighted: mega-markdown-mode"
-  (:ms 11 :date "2026-10-10" :commit "ea12a01"
+  (:ms 11 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("indentation guides over 4000 lines"
-  (:ms 79 :date "2026-10-10" :commit "ea12a01"
+  (:ms 79 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("save a file after a small edit, ten times"
-  (:ms 12 :date "2026-10-10" :commit "ea12a01"
+  (:ms 12 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("save a file with a megabyte of undo history"
-  (:ms 38 :date "2026-10-10" :commit "ea12a01"
+  (:ms 38 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("open a file and get its undo history back"
-  (:ms 70 :date "2026-10-10" :commit "ea12a01"
+  (:ms 70 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("undo tree: draw a history of 2000 changes"
-  (:ms 16 :date "2026-10-10" :commit "ea12a01"
+  (:ms 16 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("undo tree: twenty moves in a history of 2000 changes"
-  (:ms 241 :date "2026-10-10" :commit "ea12a01"
+  (:ms 241 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("debugger: take in 1000 messages"
-  (:ms 2.9 :date "2026-10-10" :commit "ea12a01"
+  (:ms 2.9 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("draw the home page 50 times"
-  (:ms 111 :date "2026-10-10" :commit "ea12a01"
+  (:ms 111 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("draw the cheat sheet 20 times"
-  (:ms 6.2 :date "2026-10-10" :commit "ea12a01"
+  (:ms 6.2 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("language server: load eglot and connect, first time"
-  (:ms 62 :limit 400 :date "2026-10-10" :commit "ea12a01"
+  (:ms 62 :limit 400 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review.")))

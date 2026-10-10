@@ -2,7 +2,7 @@
 
 ;;; Commentary:
 
-;; Not an ERT file.  `tests/test_mega2.sh bench' loads it after the real init
+;; Not an ERT file.  `tests/run.sh bench' loads it after the real init
 ;; files, in the same sandbox as the tests, and it times the paths of MEGA
 ;; that a person waits on: a keystroke, the modeline, the completion menu,
 ;; listing and finding a file, a search, a save, the undo tree, a debugger
@@ -935,11 +935,11 @@ A line is a verdict, a tab, and the text: `ok', `slow', `bad', or `note'.
                      (mapconcat (lambda (one) (format "`%s'" (car one))) (reverse over) ", ")))
       (princ (format "note\t%s: first the cause, then the fix.\n"
                      (file-relative-name mega-bench-history-file
-                                         (expand-file-name "../.." mega-test-dir))))
+                                         (expand-file-name ".." mega-test-dir))))
       (dolist (one (reverse over))
         (pcase-let ((`(,name ,time ,factor ,record) one))
           (princ (format "note\t\nnote\t%s\n" name))
-          (princ (format "note\t  to find the commit:  git bisect start HEAD %s && git bisect run env MEGA_BENCH_ONLY=%s tests/test_mega2.sh bench\n"
+          (princ (format "note\t  to find the commit:  git bisect start HEAD %s && git bisect run env MEGA_BENCH_ONLY=%s tests/run.sh bench\n"
                          (plist-get record :commit)
                          ;; In quotes a person can read: all of it literal
                          ;; but a quote of its own, which ends them, is
@@ -953,7 +953,7 @@ A line is a verdict, a tab, and the text: `ok', `slow', `bad', or `note'.
     (when-let* ((file (getenv "MEGA_BENCH_SAVE")))
       (unless (string-empty-p file)
         (with-temp-file file
-          (insert ";; Times of one run of tests/test_mega2.sh bench, in milliseconds.\n")
+          (insert ";; Times of one run of tests/run.sh bench, in milliseconds.\n")
           (prin1 (list :machine (plist-get machine :lisp)
                        :process (plist-get machine :process)
                        :times (reverse times))

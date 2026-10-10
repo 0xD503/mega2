@@ -6,8 +6,8 @@ The agreed requirements, feature list and architecture. The user guide is
 ## The one rule
 
 MEGA 2.0 is **self-sufficient**: it uses what Emacs ships and code written for
-MEGA, and depends on no downloadable Elisp. MEGA 1, which it replaces and
-which is gone from this repo, pulled about 40
+MEGA, and depends on no downloadable Elisp. MEGA 1, which it replaces,
+pulled about 40
 packages and 15 tree-sitter parsers; 2.0 pulls none.
 
 | Decision | |
@@ -21,7 +21,8 @@ packages and 15 tree-sitter parsers; 2.0 pulls none.
 | Added | Tasks, debugger, format on save, snippets, Dev Containers, vertical ruler |
 | Not wanted | Git workflow beyond stock `vc`; spell and grammar checking |
 | Dev Containers | MEGA-native subset; official `devcontainer` CLI when it is installed |
-| Location | `.mega2.d`; default chemacs2 profile |
+| Location | A repository of its own, cloned to `~/.mega2.d`; the default chemacs2 profile |
+| Licence | Apache-2.0. `NOTICE` names the copyright holder; the code is MEGA's own, so there is nobody else's licence to honour |
 | Own language modes | Markdown, Zig, justfile; a Rust fallback for when its parser is not built |
 
 ## Priorities
@@ -177,23 +178,27 @@ compose without the official CLI; RON mode; anything GUI-specific.
 ## Architecture
 
 ```
-.mega2.d/
-  early-init.el   version gate, where files go, startup cost
-  init.el         the module list
-  local.el        machine overrides (a stub; installed by hand)
-  lisp/
-    base      mega-lib  mega-core  mega-keys  mega-ui  mega-nord-theme
-              mega-session  mega-help  mega-doctor
-    kit       mega-popup  mega-pick  mega-exec  mega-project  mega-trust
-              mega-lang  mega-compile
-    features  mega-complete  mega-workspace  mega-home  mega-search
-              mega-edit  mega-indent-guides  mega-undo  mega-undo-tree
-              mega-snippet  mega-format  mega-lsp  mega-task  mega-debug
-              mega-dap  mega-container  mega-remote  mega-llm  mega-zone
-    modes     mega-mode-markdown  mega-mode-zig  mega-mode-just  mega-mode-rust
-tests/mega2/      ERT suite and the two start-up probes (not deployed)
-tests/test_mega2.sh
+early-init.el     version gate, where files go, startup cost
+init.el           the module list
+local.example.el  machine overrides to start a local.el from; git ignores
+                  local.el itself
+lisp/
+  base      mega-lib  mega-core  mega-keys  mega-ui  mega-nord-theme
+            mega-session  mega-help  mega-doctor
+  kit       mega-popup  mega-pick  mega-exec  mega-project  mega-trust
+            mega-lang  mega-compile
+  features  mega-complete  mega-workspace  mega-home  mega-search
+            mega-edit  mega-indent-guides  mega-undo  mega-undo-tree
+            mega-snippet  mega-format  mega-lsp  mega-task  mega-debug
+            mega-dap  mega-container  mega-remote  mega-llm  mega-zone
+  modes     mega-mode-markdown  mega-mode-zig  mega-mode-just  mega-mode-rust
+tests/            the ERT suite, the probes, the stand-in programs, the
+                  bench and its history; Emacs never loads any of it
+tests/run.sh      runs them
 ```
+
+The repository is the configuration directory: cloned to `~/.mega2.d`,
+its top is what Emacs is pointed at.
 
 - **Layers, dependencies pointing down only:** features → kit → base → Emacs.
   A module `require`s what it calls, so the layering is in the code and not
@@ -319,13 +324,14 @@ tests/test_mega2.sh
 | M5 | GUD debugging, Claude, undo tree + persistence, remote, zone | done |
 | M6 | Debug adapter client, used for debugging in a container | done |
 | — | MEGA compiles itself: a compiled copy in the cache, made in the background, native through Emacs's JIT (requested after the review) | done |
+| — | A repository of its own, out of the dotfiles it grew up in; its history came along | done |
 | — | Architecture review, 37 findings: trust as an act and not a prompt, Emacs's own launch points gated, one process layer with three places, one rule for what leaves no trace, the two tables, tests over the wire, the bench rebuilt | done |
 
 Each milestone ends with its unit tests, doctor rows and guide entries.
 
 ## Testing
 
-`tests/test_mega2.sh` runs five stages in a sandbox, without the network,
+`tests/run.sh` runs five stages in a sandbox, without the network,
 and a sixth when it is asked for by name:
 
 | Stage | Checks |
@@ -351,7 +357,7 @@ second time. Memory is collected as in a running session. A run can be
 saved and compared with (`MEGA_BENCH_SAVE`, `MEGA_BENCH_COMPARE`).
 
 The expected times are kept apart from the benchmarks, in
-`tests/mega2/mega-bench-history.eld`: for each, every time it was ever held
+`tests/mega-bench-history.eld`: for each, every time it was ever held
 to, with the date, the commit that changed what it takes, and the reason.
 A benchmark has no number of its own, so a time cannot be raised without a
 record, and the stage fails on a record that lacks its commit or its
@@ -365,7 +371,7 @@ record after it, in a commit of its own. The
 harness was itself tried both ways: a threefold slowdown put into a copy of
 the code fails it, and a machine kept busy by twice as many spinning
 processes as it has processors does not. A new feature with something a
-person waits on gets a benchmark in `tests/mega2/mega-bench.el`.
+person waits on gets a benchmark in `tests/mega-bench.el`.
 
 The promises about security and privacy are tested by what happens, not by
 what a variable holds: a file of every kind is opened in an untrusted
@@ -451,25 +457,22 @@ Things learned while building it, worth keeping in mind:
 
 ## Installing and updating
 
-`update.sh` at the top of the repo installs MEGA (`install mega2`) and
-updates it by the same command; `user`, which deploys every dotfile, does the
-same for MEGA's directory. Either way `~/.mega2.d` ends up holding exactly
-the repo's files. The script keeps a list of what it installed, under
-`~/.local/state/dotfiles/`, and on the next run removes from `~/.mega2.d`
-what is on the old list and not on the new one, after backing it up; a file
-it never listed is never removed, and a list is believed only about paths
-inside the directory it belongs to. `uninstall mega2` removes what is
-listed and the compiled copies in the cache, keeps `local.el`, the state
-directory and the backups of your files, and leaves a mark so that `user`
-does not put MEGA back.
+MEGA is installed by cloning this repository to the directory Emacs is
+pointed at, and updated by pulling. Git then leaves the directory holding
+exactly the new version's files, which is all an installer has to get
+right; `local.el` is ignored by git and so is never in its way. MEGA began
+as a directory of its author's dotfiles and was moved out with its
+history: each commit from before the move ends in a `Dotfiles-commit:`
+line naming the commit it was there, and in those commits the files are
+where they were then, under `.mega2.d/` and `tests/mega2/`.
 
 What makes an update safe on MEGA's side is that nothing it keeps is
 trusted on the way back in: the trust store, workspaces, undo histories and
 approvals are data, checked when read, and ignored when they do not check,
 which costs a question asked again and never a file. The compiled copy is
 used only for the source it was made from. And MEGA writes nothing into
-`~/.mega2.d` or the repo, so there is no state there for an update to
-collide with.
+its own directory, so git finds there what you changed and nothing that
+running Emacs did.
 
 ## Open points
 

@@ -204,7 +204,13 @@ Emacs runs git on opening a file; git must not obey that config."
   (mega-test-with-directory dir
     (let ((copy (expand-file-name "config/" dir))
           (report (expand-file-name "report" dir)))
-      (copy-directory mega-test-config-dir copy nil t t)
+      ;; What Emacs loads, and not the repository it lies in.
+      (make-directory copy)
+      (dolist (file '("early-init.el" "init.el"))
+        (copy-file (expand-file-name file mega-test-config-dir)
+                   (expand-file-name file copy)))
+      (copy-directory (expand-file-name "lisp" mega-test-config-dir)
+                      (expand-file-name "lisp/" copy) nil t t)
       (mega-test-write (expand-file-name "local.el" copy)
                        ";;; -*- lexical-binding: t; -*-"
                        "(this-function-does-not-exist)" "")

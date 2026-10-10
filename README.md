@@ -6,28 +6,28 @@ built is in [DESIGN.md](DESIGN.md).
 
 ## Install, update, remove
 
-From the dotfiles repo:
+MEGA is this repository, cloned to where Emacs is told to look:
 
 ```sh
-./update.sh install mega2      # install it, or update it: the same command
-./update.sh install chemacs2   # optional: makes MEGA what plain `emacs` starts
-./update.sh uninstall mega2    # remove it
+git clone https://github.com/0xD503/mega2.git ~/.mega2.d
+emacs --init-directory ~/.mega2.d
 ```
 
-Updating is safe to do at any time. `~/.mega2.d` ends up holding exactly the
-repo's files: what an older version had and this one has not is removed, and
-everything replaced or removed is first copied to `~/.dotfiles-backup/`.
-Your `local.el` is never touched. What MEGA remembers (history, undo, trusted
-projects, workspaces) lives elsewhere and is read with care: a file a newer
-MEGA cannot make sense of is ignored, never guessed at, so the worst an
-update can do is make MEGA ask or forget something once. Its compiled copy
-is rebuilt by itself. Restart Emacs afterwards: a running one goes on with
-the version it loaded. `./update.sh user`, which deploys every dotfile,
-updates MEGA the same way.
+With [chemacs2](https://github.com/plexus/chemacs2), name `~/.mega2.d` as
+the default profile and plain `emacs` starts it.
 
-Removing it takes away what was installed and what MEGA built; your
-`local.el`, your history and MEGA's backups of your files stay, and the
-command says where.
+To update, `git -C ~/.mega2.d pull --ff-only`, and restart Emacs: a running
+one goes on with the version it loaded. Updating is safe to do at any time.
+Git leaves the directory holding exactly the new version's files, and your
+`local.el` is not git's to touch. What MEGA remembers (history, undo,
+trusted projects, workspaces) lives elsewhere and is read with care: a file
+a newer MEGA cannot make sense of is ignored, never guessed at, so the worst
+an update can do is make MEGA ask or forget something once. Its compiled
+copy is rebuilt by itself.
+
+To remove it, delete `~/.mega2.d`. What MEGA remembers is in
+`~/.local/state/mega2`, and what it built, with its backups of your files,
+in `~/.cache/mega2`: yours to keep or delete.
 
 ## Start
 
@@ -51,8 +51,8 @@ C-c ?                every MEGA key, and the keys of each place that has its own
 update runs MEGA's Lisp as source and, a few seconds later, compiles a copy
 in the background. Every start after that loads the copy, and Emacs turns
 what it loads into native code by itself, also in the background. The copy
-lives in `~/.cache/mega2`; nothing compiled is ever written to `~/.mega2.d`
-or to the repository. `M-x mega-doctor` says which form is running.
+lives in `~/.cache/mega2`; nothing compiled is ever written to `~/.mega2.d`,
+which is to say into this repository. `M-x mega-doctor` says which form is running.
 
 ## Keys
 
@@ -174,9 +174,9 @@ files of its directory and nothing below it.
 | Add a snippet | `mega-snippets` in `lisp/mega-snippet.el` |
 | Remove a feature | delete its line in `init.el`; its keys go with it |
 
-`local.el` is never installed or overwritten by `./update.sh install mega2`
-or `./update.sh user`; put the stub in place once with `./update.sh local
-user`. A project's `.editorconfig` sets its
+`local.el` is yours: git ignores it, so an update never touches it. Start
+from the examples with `cp local.example.el local.el`. A project's
+`.editorconfig` sets its
 indentation and line endings, moves the ruler (`max_line_length`), and says
 whether spaces at the ends of lines are removed. A module that others are
 built on (`mega-exec`, `mega-trust`, `mega-project`, `mega-lang`) stays
@@ -221,10 +221,10 @@ mega-compile nil)` in `local.el` stops MEGA from making one.
 ## Tests and timings
 
 ```sh
-tests/test_mega2.sh          # from the dotfiles repo; runs in a sandbox
-tests/test_mega2.sh bench    # only the timings
-MEGA_TEST_ONLY=mega-undo tests/test_mega2.sh unit    # only the tests so named
-MEGA_REAL_IMAGE=my/image tests/test_mega2.sh container   # a real container: see below
+tests/run.sh                 # everything, in a sandbox
+tests/run.sh bench           # only the timings
+MEGA_TEST_ONLY=mega-undo tests/run.sh unit    # only the tests so named
+MEGA_REAL_IMAGE=my/image tests/run.sh container   # a real container: see below
 ```
 
 The tests run on both forms of MEGA's Lisp, source and compiled, and a real
@@ -240,7 +240,7 @@ cost time, keep a run with `MEGA_BENCH_SAVE=before.eld`; afterwards
 slow as it was.
 
 What each benchmark is expected to take is on record in
-`tests/mega2/mega-bench-history.eld`, with the commit that made it so and the
+`tests/mega-bench-history.eld`, with the commit that made it so and the
 reason; there is no number anywhere else to change. When one is exceeded,
 whoever sees it finds the cause first (the stage prints the `git bisect`
 command) and fixes it. Only if the slowdown is the reasonable, direct and
@@ -250,3 +250,10 @@ with a new record: the time, the commit that introduced it, and why.
 The `container` stage runs only when named. It starts one container with
 podman from an image you already have, with no network, runs, builds and
 debugs in it, and removes it; nothing is downloaded.
+
+## Licence
+
+Copyright 2026 0xD503. MEGA 2.0 is under the
+[Apache License, Version 2.0](LICENSE): use it, change it and pass it on,
+keeping the licence and the [NOTICE](NOTICE) with it and saying what you
+changed.

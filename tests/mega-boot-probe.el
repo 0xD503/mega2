@@ -4,7 +4,7 @@
 
 ;; Not an ERT file: it has to be in place before MEGA loads.  It records every
 ;; attempt to run a program or open a connection, starts MEGA exactly as the
-;; unit tests do, and then checks what happened.  tests/test_mega2.sh runs it
+;; unit tests do, and then checks what happened.  tests/run.sh runs it
 ;; in a fresh batch Emacs, requires its "verdict=ok" line, and reads the
 ;; "load-ms" and "after-ms" lines for the startup budget: the init files, and
 ;; what they put off until Emacs has started.  Both are waited for.
