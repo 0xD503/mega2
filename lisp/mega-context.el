@@ -222,6 +222,26 @@ where the line that is furthest away stands."
           ((< width 8) nil)
           (t (concat "…" (truncate-string-to-width line long (- long (1- width))))))))
 
+(defun mega-context--beside-known-p (start indent)
+  "Non-nil if the line at START is in the same blocks as the line last worked out.
+INDENT is what `mega-context--indentation' says of the line at START.
+It is so for the line right above or right below that one, if both
+count for exactly as deep as they are indented, and equally deep: then
+neither can open a block for the other, and what is above the one is
+above the other.  A line that begins by closing something counts for
+deeper than it is, and may well open what follows it, as an else does.
+This is what moving through a block line by line meets, and it saves
+looking all the way up again at every line."
+  (let ((known mega-context--known))
+    (and known
+         (eql indent (nth 3 known))
+         (eql indent (save-excursion (goto-char start) (current-indentation)))
+         (eql indent (save-excursion (goto-char (car known)) (current-indentation)))
+         (or (eql (car known) (save-excursion (goto-char start)
+                                              (forward-line -1) (point)))
+             (eql start (save-excursion (goto-char (car known))
+                                        (forward-line -1) (point)))))))
+
 (defun mega-context--headers-here ()
   "The lines that open the blocks the line at point is in, kept between calls."
   (let ((start (line-beginning-position))
@@ -234,7 +254,9 @@ where the line that is furthest away stands."
                   (save-excursion (back-to-indentation) (point))
                   (save-excursion (beginning-of-line) (mega-context--blank-p))
                   indent
-                  (mega-context-headers))))
+                  (if (mega-context--beside-known-p start indent)
+                      (nth 4 mega-context--known)
+                    (mega-context-headers)))))
     (nth 4 mega-context--known)))
 
 (defun mega-context--changed (start _end _length)

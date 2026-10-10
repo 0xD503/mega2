@@ -331,6 +331,63 @@ Return what the line above the text then says, or nil if there is none."
         (run-hooks 'post-command-hook)
         (should (= refreshed 1))))))
 
+(ert-deftest mega-context-going-line-by-line-finds-what-looking-afresh-finds ()
+  "What is kept from the line before must be what would be found anyway."
+  (dolist (case (list (cons #'mega-rust-mode mega-context-test--rust)
+                      (cons #'python-mode
+                            '("class Shop:" "    \"\"\"Sells things."
+                              "Nothing here is indented." "    \"\"\"" ""
+                              "    def price(self, item):" "        if item.rare:"
+                              "            return 9" "        else:"
+                              "            return 1" "" "top = 1"))
+                      (cons #'c-mode
+                            '("int main(void)" "{" "    int n = 0;" "#ifdef DEBUG"
+                              "    n++;" "#endif" "    while (n < 3)" "    {"
+                              "        n++;" "out:" "        puts(\"x\");" "    }"
+                              "    return n;" "}"))
+                      ;; Indented any old way.
+                      (cons #'mega-rust-mode
+                            '("a {" "    b" "     c" "    }" "     d" "  e" "    f"
+                              "" "    g" "}" " h" "i"))
+                      ;; One column a level, as Lisp has it: the line under
+                      ;; an else is as deep as the else counts for, and is
+                      ;; in the else, not beside it.
+                      (cons #'mega-rust-mode
+                            '("a {" " if x {" "  one" " } else {" "  two" " }"
+                              "  " " three" "}"))))
+    (mega-context-test--in (car case) (cdr case)
+      (let ((lines (count-lines (point-min) (point-max)))
+            (looked 0)
+            (look (symbol-function 'mega-context-headers)))
+        ;; Down the buffer, then up it, then every other line.
+        (dolist (order (list (number-sequence 1 lines)
+                             (number-sequence lines 1 -1)
+                             (number-sequence 1 lines 2)))
+          (setq mega-context--known nil)
+          (dolist (line order)
+            (goto-char (point-min))
+            (forward-line (1- line))
+            (ert-info ((format "line %d: %s" line
+                               (buffer-substring (point) (line-end-position))))
+              (should (equal (mega-context--headers-here)
+                             (mega-context-headers))))))
+        ;; And something is saved by it: in the long run of the match arms
+        ;; of a larger piece of code, nearly every look.
+        (erase-buffer)
+        (insert "fn long() {\n" (mapconcat (lambda (n) (format "    step(%d);" n))
+                                           (number-sequence 1 50) "\n")
+                "\n}\n")
+        (setq mega-context--known nil)
+        (cl-letf (((symbol-function 'mega-context-headers)
+                   (lambda (&rest arguments)
+                     (setq looked (1+ looked))
+                     (apply look arguments))))
+          (dotimes (line 50)
+            (goto-char (point-min))
+            (forward-line (1+ line))
+            (mega-context--headers-here)))
+        (should (= looked 1))))))
+
 (ert-deftest mega-context-a-command-on-a-buffer-nobody-sees-works-nothing-out ()
   "A program that edits a buffer in the background pays nothing either."
   (mega-context-test--in #'mega-rust-mode mega-context-test--rust
