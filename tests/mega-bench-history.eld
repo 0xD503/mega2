@@ -134,4 +134,13 @@
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("language server: load eglot and connect, first time"
   (:ms 62 :limit 400 :date "2026-10-10" :commit "915d253"
-   :reason "Established: the bench as rebuilt after the architecture review.")))
+   :reason "Established: the bench as rebuilt after the architecture review."))
+ ("which block you are in: 1000 commands along a line"
+  (:ms 1.7 :date "2026-10-10" :commit "5caee9c"
+   :reason "Established.  The feature came in 521a1dc, where a command paid some four millionths of a second for it; this is what it pays since the cursor staying on its line was made to cost five comparisons."))
+ ("which block you are in: find it 300 lines in, 100 times"
+  (:ms 30 :date "2026-10-10" :commit "521a1dc"
+   :reason "Established with the feature: a millionth of a second for each line between the cursor and the outermost line that opens a block around it, paid when the cursor comes to a line that is not beside the last."))
+ ("who changed a line: ask git and show it, five lines"
+  (:ms 30 :date "2026-10-10" :commit "a95082f"
+   :reason "Established with the feature: one git for each line, in the background, in a file with forty changes behind it.")))

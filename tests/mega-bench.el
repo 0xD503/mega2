@@ -598,6 +598,120 @@ is called after each character as well."
          (mega-indent-guides-mode 1)
          (font-lock-ensure))))))
 
+(defun mega-bench--nested (lines)
+  "A buffer of code in which line LINES is four blocks deep, far from where
+each of them opens; the cursor is put there, and the buffer is returned."
+  (require 'mega-mode-rust)
+  (let ((buffer (generate-new-buffer " *mega-bench*")))
+    (with-current-buffer buffer
+      (insert "impl Bench {\n    fn long(&self) {\n        loop {\n            match self.next() {\n")
+      (dotimes (index lines)
+        (insert (format "                Step::Number%d => self.take(%d),\n" index index)))
+      (insert "            }\n        }\n    }\n}\n")
+      (mega-rust-mode)
+      (goto-char (point-min))
+      (forward-line (+ 3 lines)))
+    buffer))
+
+(mega-bench-define
+ "which block you are in: 1000 commands along a line"
+ (lambda ()
+   (require 'mega-context)
+   (let ((buffer (mega-bench--nested 300)))
+     (lambda ()
+       (unwind-protect
+           (save-window-excursion
+             (switch-to-buffer buffer)
+             (mega-context-mode 1)
+             (set-window-start (selected-window) (line-beginning-position 0))
+             (cl-letf (((symbol-function 'mega-context--width) (lambda (_window) 100)))
+               (mega-context-refresh)
+               (unless header-line-format
+                 (error "The line above the text is not showing"))
+               (end-of-line)
+               ;; What a key means to this feature, and nothing else of what
+               ;; a key sets off: the text has changed here, and then the
+               ;; command is over.
+               (dotimes (_ 1000)
+                 (mega-context--changed (point) (point) 0)
+                 (mega-context--post-command))
+               (unless (window-parameter nil 'mega-context)
+                 (error "The line above the text went away"))))
+         (with-current-buffer buffer (set-buffer-modified-p nil))
+         (kill-buffer buffer))))))
+
+(mega-bench-define
+ "which block you are in: find it 300 lines in, 100 times"
+ (lambda ()
+   (require 'mega-context)
+   (let ((buffer (mega-bench--nested 300)))
+     (lambda ()
+       (unwind-protect
+           (with-current-buffer buffer
+             (dotimes (_ 100)
+               (let ((headers (mega-context-headers)))
+                 (unless (= (length headers) 4)
+                   (error "Found %d lines, not the four" (length headers)))
+                 (mega-context--join headers 100))))
+         (kill-buffer buffer))))))
+
+(defvar mega-bench--history-of-a-file nil
+  "A file in a git repository with forty changes behind it, once made.")
+
+(defun mega-bench--history-of-a-file ()
+  "A file of 200 lines that forty changes made, in a repository of its own."
+  (or mega-bench--history-of-a-file
+      (let* ((default-directory (mega-bench--directory "bench-blame-"))
+             (file (expand-file-name "history.txt"))
+             (process-environment (append '("GIT_CONFIG_GLOBAL=/dev/null"
+                                            "GIT_CONFIG_NOSYSTEM=1")
+                                          process-environment))
+             (git (lambda (&rest arguments)
+                    (unless (eql 0 (apply #'call-process "git" nil nil nil
+                                          "-c" "user.name=Bench"
+                                          "-c" "user.email=bench@example.invalid"
+                                          "-c" "commit.gpgsign=false" arguments))
+                      (error "git %s failed" arguments)))))
+        (funcall git "init" "--quiet")
+        (dotimes (change 40)
+          (with-temp-file file
+            (dotimes (line 200)
+              ;; Each change rewrites every fortieth line, its own ones.
+              (insert (format "line %d as of change %d\n" line
+                              (if (<= (% line 40) change) (% line 40) 0)))))
+          (funcall git "add" "history.txt")
+          (funcall git "commit" "--quiet" "--allow-empty" "-m" (format "Change %d" change)))
+        (setq mega-bench--history-of-a-file file))))
+
+(mega-bench-define
+ "who changed a line: ask git and show it, five lines"
+ (lambda ()
+   (require 'mega-blame)
+   (if (not (executable-find "git"))
+       (lambda () '(:skip "git is not installed"))
+     (let ((buffer (find-file-noselect (mega-bench--history-of-a-file))))
+       (lambda ()
+         (unwind-protect
+             (save-window-excursion
+               (switch-to-buffer buffer)
+               (mega-blame-mode 1)
+               (cl-letf (((symbol-function 'mega-blame--room) (lambda () 70)))
+                 (dolist (line '(7 45 90 133 199))
+                   (goto-char (point-min))
+                   (forward-line (1- line))
+                   (run-hooks 'post-command-hook)
+                   (mega-blame--idle)
+                   ;; No sooner and no later than git has answered.
+                   (let ((deadline (+ (float-time) 20)))
+                     (while (and mega-blame--process (< (float-time) deadline))
+                       (accept-process-output nil 0.005)))
+                   (when mega-blame--process
+                     (error "git did not answer"))
+                   (unless (overlayp mega-blame--overlay)
+                     (error "Nothing is shown on line %d" line)))))
+           (kill-buffer buffer))))))
+ :kind 'process)
+
 (mega-bench-define
  "save a file after a small edit, ten times"
  (lambda ()
