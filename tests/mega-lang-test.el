@@ -9,6 +9,7 @@
 (require 'imenu)
 
 (defvar mega-test-pwned)
+(defvar treesit-language-source-alist)
 
 (defvar mega-lang-test--y-or-n-p (symbol-function 'y-or-n-p)
   "Emacs's own `y-or-n-p', to check that it is put back.")
@@ -20,6 +21,7 @@ Nothing is ever offered for installation, and no decision is recorded."
   `(mega-test-with-directory lang-dir
      (let ((treesit-auto-install-grammar nil)
            (mega-lang--declined nil)
+           (mega-lang--failed nil)
            (mega-lang-declined-file (expand-file-name "declined.eld" lang-dir))
            ;; Replacing a built-in needs a real temporary directory.
            (temporary-file-directory (file-name-as-directory (getenv "TMPDIR"))))
@@ -204,7 +206,9 @@ ASKED counts the offers made.  The stand-in asks its question the way
 Emacs does, through `y-or-n-p', and installs only after a yes; BUILDS is
 what the installation returns, or `error' to make it signal."
   (declare (indent 2))
-  `(let ((treesit-auto-install-grammar 'ask) (noninteractive nil) (asked 0))
+  `(let ((treesit-auto-install-grammar 'ask) (noninteractive nil) (asked 0)
+         ;; Emacs knows where the parser comes from: that is another test.
+         (treesit-language-source-alist '((rust "https://example.invalid/rust"))))
      (cl-letf (((symbol-function 'y-or-n-p)
                 (lambda (&rest _) (setq asked (1+ asked)) ,answer))
                ((symbol-function 'treesit-ensure-installed)
@@ -228,19 +232,160 @@ what the installation returns, or `error' to make it signal."
       (should-not (mega-lang-parser-p 'rust))
       (should (= asked 2)))))
 
-(ert-deftest mega-lang-a-parser-that-failed-to-build-is-offered-again ()
-  "Saying yes with no network or no compiler is not saying no."
+(ert-deftest mega-lang-a-parser-that-failed-to-build-is-offered-again-next-session ()
+  "Saying yes with no network or no compiler is not saying no.
+And it is not a reason to ask at every file until Emacs is restarted."
   (mega-lang-test--with-parsers nil
     (dolist (outcome '(nil error))
+      (setq mega-lang--failed nil)
       (mega-lang-test--offering t outcome
         (should-not (mega-lang-parser-p 'rust))
         (should-not (memq 'rust (mega-lang--declined)))
-        ;; The offer comes again the next time such a file is opened.
+        ;; Not again in this session...
         (should-not (mega-lang-parser-p 'rust))
-        (should (= asked 2))))
+        (should (= asked 1))
+        ;; ...and again in the next, which starts with nothing remembered.
+        (setq mega-lang--failed nil
+              mega-lang--declined 'unread)
+        (should-not (mega-lang-parser-p 'rust))
+        (should (= asked 2))
+        ;; Or at once, when the user says to ask again.
+        (mega-lang-ask-again)
+        (should-not (mega-lang-parser-p 'rust))
+        (should (= asked 3))))
     ;; And whatever happened, the question function is Emacs's own again.
     (should (eq (symbol-function 'y-or-n-p)
                 (default-toplevel-value 'mega-lang-test--y-or-n-p)))))
+
+(ert-deftest mega-lang-nothing-is-asked-about-a-parser-emacs-cannot-build ()
+  "A question whose yes can lead nowhere is not asked."
+  (mega-lang-test--with-parsers nil
+    (mega-lang-test--offering t t
+      (let ((treesit-language-source-alist nil))
+        (should-not (mega-lang-parser-p 'rust))
+        (should (= asked 0))
+        (should-not (mega-lang--declined))
+        (should-not mega-lang--failed)))))
+
+(ert-deftest mega-lang-a-new-session-can-build-what-it-offers ()
+  "In a session that has loaded no mode yet, a yes leads Emacs to a build.
+Emacs learns where a parser's source is from the library its mode is
+defined in.  Asked before that is loaded it has nothing to go by: it
+fails whatever the answer was, nothing is ever installed, and the
+question comes back at every file.  Each language gets a session of
+its own here, as the first file of a session would."
+  (skip-unless (and (fboundp 'treesit-available-p) (treesit-available-p)))
+  (mega-test-with-directory dir
+    (dolist (spec mega-languages)
+      (let ((parser (plist-get (cdr spec) :parser))
+            (mode (plist-get (cdr spec) :ts))
+            (report (expand-file-name (format "report-%s" (car spec)) dir)))
+        ;; Where the parser is installed for the whole machine there is
+        ;; nothing to offer, and nothing to check.
+        (when (and parser mode (not (treesit-language-available-p parser)))
+          (call-process
+           (expand-file-name invocation-name invocation-directory)
+           nil nil nil "-Q" "--batch"
+           "-l" (expand-file-name "early-init.el" mega-test-config-dir)
+           "--eval"
+           (prin1-to-string
+            `(progn
+               (require 'mega-lang)
+               (require 'cl-lib)
+               ;; Loaded now, or loading it later would put Emacs's own
+               ;; build step back in place of the stand-in.  It knows no
+               ;; parser's source by itself: the modes' libraries do.
+               (require 'treesit)
+               ;; Whatever else happens, nothing is fetched and nothing is
+               ;; compiled: there is no program to do it with.
+               (setq exec-path nil)
+               (setenv "PATH" "")
+               (let ((noninteractive nil) asked builds)
+                 (cl-letf (((symbol-function 'y-or-n-p)
+                            (lambda (&rest _) (setq asked t)))
+                           ((symbol-function 'treesit--install-language-grammar-1)
+                            (lambda (directory language url &rest _)
+                              (push (list language url directory) builds)))
+                           ((symbol-function 'display-warning) #'ignore))
+                   (with-temp-buffer (mega-lang-enter ',(car spec))))
+                 (with-temp-file ,report
+                   (prin1 (list asked builds mega-lang--failed)
+                          (current-buffer)))))))
+          (ert-info ((format "language: %s" (car spec)))
+            (should (file-readable-p report))
+            (pcase-let ((`(,asked ,builds ,failed)
+                         (with-temp-buffer (insert-file-contents report)
+                                           (read (current-buffer)))))
+              (should asked)
+              ;; Emacs got as far as building, and knew what and from where.
+              (should (equal (mapcar #'car builds) (list parser)))
+              (should (string-prefix-p "https://" (nth 1 (car builds))))
+              ;; Into MEGA's data directory, where the next session finds it.
+              (should (file-in-directory-p (nth 2 (car builds)) (mega-data "")))
+              ;; The stand-in built nothing, and that is taken for what it is.
+              (should (equal failed (list parser))))))))))
+
+(defmacro mega-lang-test--installing (answer &rest body)
+  "Run BODY with the question of `mega-lang-install-parsers' answered ANSWER.
+ASKED holds the questions, BUILT the parsers Emacs was told to build;
+a parser is there once it was built, except the one called `go', whose
+build fails."
+  (declare (indent 1))
+  `(let ((asked nil) (built nil)
+         (treesit-language-source-alist
+          '((rust "https://example.invalid/rust") (go "https://example.invalid/go")
+            (bash "https://example.invalid/bash"))))
+     (cl-letf (((symbol-function 'treesit-available-p) (lambda () t))
+               ((symbol-function 'treesit-language-available-p)
+                (lambda (parser &rest _)
+                  (or (eq parser 'bash)
+                      (and (memq parser built) (not (eq parser 'go))))))
+               ((symbol-function 'yes-or-no-p)
+                (lambda (prompt) (push prompt asked) ,answer))
+               ((symbol-function 'y-or-n-p)
+                (lambda (&rest _) (error "The short question is not for this")))
+               ((symbol-function 'treesit-install-language-grammar)
+                (lambda (parser directory)
+                  (should (file-in-directory-p directory (mega-data "")))
+                  (push parser built)))
+               ((symbol-function 'mega-lang--recipe-p)
+                (lambda (parser &optional _mode)
+                  (and (assq parser treesit-language-source-alist) t))))
+       ,@body)))
+
+(ert-deftest mega-lang-all-the-missing-parsers-are-built-after-one-question ()
+  (mega-test-with-directory lang-dir
+    (let ((mega-lang--failed '(rust lua))
+          (mega-lang--declined '(rust))
+          (mega-lang-declined-file (expand-file-name "declined.eld" lang-dir))
+          (temporary-file-directory (file-name-as-directory (getenv "TMPDIR"))))
+      (mega-lang-test--installing t
+        (should (equal (mapcar #'car (mega-lang-missing-parsers)) '(rust go)))
+        (mega-lang-install-parsers)
+        ;; One question, the long kind, that names what will be fetched.
+        (should (= (length asked) 1))
+        (should (string-match-p "2 parsers (rust, go)" (car asked)))
+        ;; A parser that is there already is left alone; one that was
+        ;; declined before is built: asking for all is asking for it.
+        (should (equal (sort (copy-sequence built) #'string<) '(go rust)))
+        ;; What was built is not held to have failed any more.
+        (should (equal mega-lang--failed '(lua)))
+        (should (equal (mapcar #'car (mega-lang-missing-parsers)) '(go)))))))
+
+(ert-deftest mega-lang-no-parser-is-built-without-a-yes ()
+  (mega-test-with-directory lang-dir
+    (let ((mega-lang--failed nil)
+          (temporary-file-directory (file-name-as-directory (getenv "TMPDIR"))))
+      (mega-lang-test--installing nil
+        (mega-lang-install-parsers)
+        (should (= (length asked) 1))
+        (should-not built))
+      ;; And with nothing missing there is nothing to ask.
+      (mega-lang-test--installing t
+        (cl-letf (((symbol-function 'mega-lang-missing-parsers) #'ignore))
+          (mega-lang-install-parsers)
+          (should-not asked)
+          (should-not built))))))
 
 (ert-deftest mega-lang-an-accepted-parser-is-used ()
   (mega-lang-test--with-parsers nil

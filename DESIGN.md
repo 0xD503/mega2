@@ -14,7 +14,7 @@ packages and 15 tree-sitter parsers; 2.0 pulls none.
 | --- | --- |
 | Emacs | 31.1 or newer |
 | Code allowed | Emacs built-ins + code written for MEGA. No packages, no vendored third-party files |
-| Tree-sitter parsers | Emacs 31's own prompt offers to build one; MEGA has no installer |
+| Tree-sitter parsers | Emacs 31's own prompt offers to build one, and `mega-lang-install-parsers` has Emacs build all the missing ones after one question; MEGA has no installer of its own |
 | Completion popup | None is built in, so MEGA writes one on 31.1's terminal child frames |
 | Project search | Live, as you type |
 | Kept from MEGA 1 | Workspaces, Claude CLI, undo tree + persistent undo, indent guides |
@@ -456,6 +456,15 @@ Things learned while building it, worth keeping in mind:
 - A variable of a library that is not loaded yet is not special. Bound
   with `let` in a file with lexical binding it switches nothing off, and
   the library then fails to load inside that `let`. Declare it first.
+- A stand-in placed too high hides what lies under it. The parser offer was
+  tested with the whole of Emacs's install function replaced, so nothing
+  noticed that Emacs learns where a parser's source is only from the
+  library its mode is defined in, and was being asked before that was
+  loaded: every yes failed without a word and the question came back at
+  each file. The test now starts a session per language, as the first file
+  of a session would, and replaces only the step that runs git and the
+  compiler; and it takes away every program first, in case the stand-in
+  does not hold, which it did not at the first try.
 - Tests are worth only what they can fail on. Each milestone's safety,
   privacy and security checks were run against deliberately broken copies
   of the code (`MEGA_TEST_CONFIG` points the suite at a copy).

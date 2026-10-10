@@ -34,8 +34,17 @@
 ;; Tree-sitter parsers are not bundled with Emacs.  The first time you open a
 ;; file whose language has one, Emacs asks whether to fetch and build it;
 ;; that is Emacs's own prompt, and the only download MEGA ever leads to.  Say
-;; no and the file opens in the :plain mode; the question is not asked again
-;; for that language until `M-x mega-lang-ask-again'.
+;; yes, and the parser is built into MEGA's data directory and used from then
+;; on, in every session.  Say no and the file opens in the :plain mode; the
+;; question is not asked again for that language until `M-x
+;; mega-lang-ask-again'.  `M-x mega-lang-install-parsers' builds all the
+;; missing ones in one go, after one question.
+;;
+;; Where a parser's source is, and which version of it a mode was written
+;; for, Emacs learns from the library that mode is defined in.  So that
+;; library is loaded before Emacs is asked to build anything: asked earlier
+;; it has nothing to go by, fails whatever the answer was, and the question
+;; comes back at the next file.
 
 ;;; Code:
 
@@ -46,10 +55,12 @@
 (declare-function treesit-available-p "treesit.c")
 (declare-function treesit-language-available-p "treesit.c")
 (declare-function treesit-ensure-installed "treesit")
+(declare-function treesit-install-language-grammar "treesit")
 (declare-function eglot-ensure "eglot")
 
 (defvar treesit-auto-install-grammar)
 (defvar treesit-extra-load-path)
+(defvar treesit-language-source-alist)
 (defvar eglot-server-programs)
 
 (defvar mega-languages
@@ -193,19 +204,37 @@ mode it derives from."
     (with-temp-file mega-lang-declined-file
       (prin1 mega-lang--declined (current-buffer)))))
 
+(defvar mega-lang--failed nil
+  "Parsers that you agreed to and that could not be built, this session.
+They are not offered again before Emacs is restarted: what was missing,
+the network or a compiler, is not there at the next file either.")
+
 (defun mega-lang-ask-again ()
   "Forget which parsers were declined, so Emacs offers them again."
   (interactive)
-  (setq mega-lang--declined nil)
+  (setq mega-lang--declined nil
+        mega-lang--failed nil)
   (when (file-exists-p mega-lang-declined-file)
     (delete-file mega-lang-declined-file))
   (message "Emacs will offer to install missing parsers again"))
 
+(defun mega-lang--recipe-p (parser &optional mode)
+  "Non-nil if Emacs knows where to get PARSER, which MODE needs.
+The library MODE is defined in is what tells it, so that is loaded
+first.  See the Commentary."
+  (let ((definition (and mode (fboundp mode) (symbol-function mode))))
+    (when (autoloadp definition)
+      (ignore-errors (autoload-do-load definition mode))))
+  (and (boundp 'treesit-language-source-alist)
+       (assq parser treesit-language-source-alist)
+       t))
+
 (defun mega-lang--offer-parser (parser)
-  "Let Emacs offer to install PARSER.  Return `installed', `declined' or nil.
-Nil means it was not installed although nobody said no: no network, no
-compiler, a build that failed.  Emacs reports all of these the same
-way, so the answer to its question is noted as it goes by."
+  "Let Emacs offer to install PARSER.
+Return `installed'; `declined'; `failed', which is a yes that led to no
+parser: no network, no compiler, a build that went wrong; or nil if
+nothing was asked.  Emacs reports all but the first the same way, so
+the answer to its question is noted as it goes by."
   (let* ((ask (symbol-function 'y-or-n-p))
          (answer 'none)
          (installed
@@ -216,25 +245,90 @@ way, so the answer to its question is noted as it goes by."
                 (ignore-errors (treesit-ensure-installed parser)))
             (fset 'y-or-n-p ask))))
     (cond (installed 'installed)
-          ((null answer) 'declined))))
+          ((null answer) 'declined)
+          ((eq answer t) 'failed))))
 
-(defun mega-lang-parser-p (parser)
+(defun mega-lang-parser-p (parser &optional mode)
   "Non-nil if PARSER is installed, or the user just agreed to install it.
-When it is missing and has not been declined before, this is where
-Emacs's own prompt appears.  A no is remembered; a failure is not, so
-that the offer comes again once whatever was missing is there."
+MODE is the tree-sitter mode that needs it.  When the parser is missing
+and has not been declined before, this is where Emacs's own prompt
+appears.  A no is remembered for good.  A yes that did not work is
+remembered until Emacs is restarted, so that the offer comes again once
+whatever was missing is there, and not at every file until then."
   (cond ((not (and (fboundp 'treesit-available-p) (treesit-available-p))) nil)
         ((treesit-language-available-p parser) t)
         ((memq parser (mega-lang--declined)) nil)
+        ((memq parser mega-lang--failed) nil)
         ;; Emacs's tree-sitter library is loaded only now, when a file
         ;; actually needs it; the prompt's setting lives there.
         ((or noninteractive
              (not (require 'treesit nil t))
              (not treesit-auto-install-grammar))
          nil)
+        ;; Nothing Emacs could build: then there is nothing to ask.
+        ((not (mega-lang--recipe-p parser mode)) nil)
         (t (pcase (mega-lang--offer-parser parser)
              ('installed t)
-             ('declined (mega-lang--decline parser) nil)))))
+             ('declined (mega-lang--decline parser) nil)
+             ('failed
+              (push parser mega-lang--failed)
+              (message "The %s parser was not built; it is offered again after a restart, or by M-x mega-lang-install-parsers"
+                       parser)
+              nil)))))
+
+(defun mega-lang-missing-parsers ()
+  "The parsers MEGA has a mode for, that are not built and that Emacs can build.
+Each is (PARSER . MODE)."
+  (let (missing)
+    (dolist (spec mega-languages)
+      (let ((parser (plist-get (cdr spec) :parser))
+            (mode (plist-get (cdr spec) :ts)))
+        (when (and parser mode (fboundp mode)
+                   (not (assq parser missing))
+                   (not (treesit-language-available-p parser))
+                   (mega-lang--recipe-p parser mode))
+          (push (cons parser mode) missing))))
+    (nreverse missing)))
+
+(defun mega-lang-install-parsers ()
+  "Build every parser MEGA has a mode for and this machine lacks.
+Emacs fetches each parser's source with git, from the address and at
+the version the mode that uses it was written for, and compiles it:
+this needs the network, git and a C compiler, and Emacs waits while it
+is done.  Parsers you declined when they were offered one by one are
+built as well: asking for all of them is asking for those."
+  (interactive)
+  (unless (and (fboundp 'treesit-available-p) (treesit-available-p))
+    (user-error "This Emacs was built without tree-sitter"))
+  (require 'treesit)
+  (let* ((missing (mega-lang-missing-parsers))
+         (names (mapconcat (lambda (entry) (symbol-name (car entry))) missing ", "))
+         (directory (mega-data "tree-sitter/"))
+         (count 0)
+         built failed)
+    (cond
+     ((null missing)
+      (message "Every parser MEGA has a mode for is built"))
+     ((yes-or-no-p (format "Download and build %d parser%s (%s)? "
+                           (length missing) (if (cdr missing) "s" "") names))
+      (dolist (entry missing)
+        (setq count (1+ count))
+        (message "Building the %s parser (%d of %d)..."
+                 (car entry) count (length missing))
+        (ignore-errors (treesit-install-language-grammar (car entry) directory))
+        (if (treesit-language-available-p (car entry))
+            (push (car entry) built)
+          (push (car entry) failed)))
+      (setq mega-lang--failed (seq-difference mega-lang--failed built))
+      (message "%s%s"
+               (if built
+                   (format "Built: %s.  Files you open from now on use them."
+                           (mapconcat #'symbol-name (nreverse built) ", "))
+                 "No parser was built.")
+               (if failed
+                   (format "  Not built: %s; *Warnings* says why."
+                           (mapconcat #'symbol-name (nreverse failed) ", "))
+                 ""))))))
 
 ;; Parsers are built into the data directory: recreating them needs the
 ;; network, so they do not belong in a cache.
@@ -252,7 +346,7 @@ that the offer comes again once whatever was missing is there."
   (let* ((row (mega-lang-row name))
          (ts (plist-get row :ts))
          (plain (plist-get row :plain)))
-    (cond ((and ts (fboundp ts) (mega-lang-parser-p (plist-get row :parser)))
+    (cond ((and ts (fboundp ts) (mega-lang-parser-p (plist-get row :parser) ts))
            (funcall ts))
           ((and plain (fboundp plain))
            (funcall plain))
@@ -394,7 +488,8 @@ opening a file is not a question.  Remote files are left alone:
               (candidates (format "no server (%s)"
                                   (mapconcat #'car candidates ", ")))
               (t ""))))))
-  (insert "\n  A missing parser is offered when you open such a file.\n"
+  (insert "\n  A missing parser is offered when you open such a file;\n"
+          "  M-x mega-lang-install-parsers builds all the missing ones at once.\n"
           "  A missing server is simply not started; install it to get one.\n"))
 
 (add-to-list 'mega-doctor-sections #'mega-lang--doctor t)

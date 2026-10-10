@@ -145,7 +145,9 @@ Everything outside Emacs is optional: without it the feature stays quiet and
 | Claude | the `claude` program, signed in |
 
 Syntax highlighting for some languages wants a parser; Emacs offers to build
-it the first time you open such a file.
+it the first time you open such a file. Say yes and it is there from then on;
+say no and the question does not come back (`M-x mega-lang-ask-again` undoes
+that). `M-x mega-lang-install-parsers` builds all the missing ones in one go.
 
 ## Trust
 
