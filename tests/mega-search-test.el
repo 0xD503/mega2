@@ -10,7 +10,7 @@
 (defmacro mega-search-test--defaults (&rest body)
   "Run BODY with every search setting at its default."
   (declare (indent 0))
-  `(let ((mega-search-case 'smart) (mega-search-untracked t)
+  `(let ((mega-search-case 'smart) (mega-search-untracked nil)
          (mega-search-ignored nil) (mega-search-hidden t)
          (mega-search-literal nil) (mega-search-word nil)
          (mega-search-submodules nil)
@@ -91,12 +91,13 @@ each containing the word needle in a different case."
   (mega-search-test--defaults
     (should (equal (mega-search-command 'git "needle" nil)
                    '("git" "--no-pager" "grep" "--line-number" "-I" "--color=never"
-                     "--perl-regexp" "--ignore-case" "--untracked"
+                     "--perl-regexp" "--ignore-case"
                      "-e" "needle" "--")))
-    (let ((mega-search-untracked nil) (mega-search-case 'sensitive))
+    ;; With what git does not track, when that is asked for.
+    (let ((mega-search-untracked t) (mega-search-case 'sensitive))
       (should (equal (mega-search-command 'git "needle" '("src"))
                      '("git" "--no-pager" "grep" "--line-number" "-I" "--color=never"
-                       "--perl-regexp" "-e" "needle" "--" "src"))))
+                       "--perl-regexp" "--untracked" "-e" "needle" "--" "src"))))
     (let ((mega-search-ignored t) (mega-search-literal t) (mega-search-word t))
       (should (equal (mega-search-command 'git "Needle" nil)
                      '("git" "--no-pager" "grep" "--line-number" "-I" "--color=never"
@@ -205,12 +206,13 @@ each containing the word needle in a different case."
   (skip-unless (executable-find "git"))
   (mega-search-test--defaults
     (mega-search-test--with-repository dir
+      ;; To begin with, what the checkout holds and nothing else.
       (should (equal (mega-search-test--files (mega-search-run "needle" dir 'git))
-                     '(".hidden/secret.txt" "src/deep/code.rs" "tracked.txt"
-                       "untracked.txt")))
-      (let ((mega-search-untracked nil))
+                     '(".hidden/secret.txt" "src/deep/code.rs" "tracked.txt")))
+      (let ((mega-search-untracked t))
         (should (equal (mega-search-test--files (mega-search-run "needle" dir 'git))
-                       '(".hidden/secret.txt" "src/deep/code.rs" "tracked.txt"))))
+                       '(".hidden/secret.txt" "src/deep/code.rs" "tracked.txt"
+                         "untracked.txt"))))
       (let ((mega-search-ignored t))
         (should (member "ignored.log"
                         (mega-search-test--files (mega-search-run "needle" dir 'git))))))))
@@ -300,7 +302,7 @@ holds each to what the table says of it."
                    (setq said (apply #'format format arguments)))))
         (let ((mega-search--backend 'rg))
           (mega-search-toggle-untracked)
-          (should-not mega-search-untracked)
+          (should mega-search-untracked)
           (should (string-match-p "\\`\\[rg  case:smart \\+hidden\\]  ripgrep cannot tell untracked"
                                   said))
           ;; One it does act on: just the settings.
@@ -483,7 +485,13 @@ And git refuses --recurse-submodules together with --untracked."
                        (sort (mapcar (lambda (hit) (car (mega-search-parse hit)))
                                      (mega-search-run "needle" outer 'git))
                              #'string<))))
-          (should (equal (funcall files) '("a.txt" "b.txt")))
+          (should (equal (funcall files) '("a.txt")))
+          (let ((mega-search-untracked t))
+            (should (equal (funcall files) '("a.txt" "b.txt")))
+            ;; Git will not do both: asked for the submodules, it searches
+            ;; what is tracked, there and here.
+            (let ((mega-search-submodules t))
+              (should (equal (funcall files) '("a.txt" "sub/s.txt")))))
           (let ((mega-search-submodules t))
             (should (equal (funcall files) '("a.txt" "sub/s.txt")))))))))
 
@@ -495,6 +503,7 @@ And git refuses --recurse-submodules together with --untracked."
       (mega-search-cycle-case) (should (eq mega-search-case 'ignore))
       (mega-search-cycle-case) (should (eq mega-search-case 'sensitive))
       (mega-search-cycle-case) (should (eq mega-search-case 'smart))
+      (mega-search-toggle-untracked) (should mega-search-untracked)
       (mega-search-toggle-untracked) (should-not mega-search-untracked)
       (mega-search-toggle-ignored) (should mega-search-ignored)
       (mega-search-toggle-hidden) (should-not mega-search-hidden)
@@ -512,7 +521,9 @@ And git refuses --recurse-submodules together with --untracked."
       (let ((mega-search-word t) (mega-search-hidden nil))
         (should (equal (mega-search-describe) "rg  case:smart words"))))
     (let ((mega-search--backend 'git))
-      (should (equal (mega-search-describe) "git  case:smart +untracked")))))
+      (should (equal (mega-search-describe) "git  case:smart"))
+      (let ((mega-search-untracked t))
+        (should (equal (mega-search-describe) "git  case:smart +untracked"))))))
 
 ;;;; The whole command
 
@@ -595,6 +606,28 @@ opened a line.  The keys are the prompt's, and the prompt is where to say so."
                           (mega-search-prompt "/home/u/src/proj" 'rg)))
   ;; Outside the prompt MEGA leaves the key to Emacs.
   (should-not (lookup-key mega-keys-mode-map (kbd "C-o"))))
+
+(ert-deftest mega-search-starts-out-as-plain-git-grep-does ()
+  "Asked for after use: what git does not track is not searched unless asked.
+The other tests set every setting themselves; this one looks at what a
+session starts with."
+  (should-not (default-toplevel-value 'mega-search-untracked))
+  (should-not (default-toplevel-value 'mega-search-ignored))
+  (should-not (default-toplevel-value 'mega-search-submodules))
+  (should (eq (default-toplevel-value 'mega-search-case) 'smart))
+  ;; And what the tests take for the defaults are the defaults.
+  (mega-search-test--defaults
+    (dolist (setting '(mega-search-case mega-search-untracked mega-search-ignored
+                       mega-search-submodules mega-search-hidden
+                       mega-search-literal mega-search-word))
+      (should (equal (list setting (symbol-value setting))
+                     (list setting (default-toplevel-value setting)))))
+    ;; Which for git means: no option that widens the search.
+    (let ((command (mega-search-command 'git "needle" nil)))
+      (should (equal (seq-take command 3) '("git" "--no-pager" "grep")))
+      (should-not (seq-intersection command
+                                    '("--untracked" "--no-exclude-standard"
+                                      "--recurse-submodules" "--no-index"))))))
 
 (provide 'mega-search-test)
 ;;; mega-search-test.el ends here

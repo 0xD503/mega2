@@ -40,7 +40,7 @@
 ;;
 ;;                       git grep           ripgrep           grep
 ;;   tracked files       always             always            always
-;;   untracked files     C-o u (on)         always            always
+;;   untracked files     C-o u (off)        always            always
 ;;   ignored files       C-o i (off)        C-o i (off)       always
 ;;   hidden files        always             C-o h (on)        C-o h (on)
 ;;   submodules          C-o s (off)        always            always
@@ -90,7 +90,10 @@ local.el to change it for good.  (`auto', an older value, means `git'.)"
 (defvar mega-search-case 'smart
   "How case is treated: `smart', `ignore' or `sensitive'.
 `smart' means case matters only if the pattern contains a capital.")
-(defvar mega-search-untracked t "Non-nil to include files git does not track.")
+(defvar mega-search-untracked nil
+  "Non-nil to include files git does not track.
+Off to begin with, as plain `git grep' has it: a search of a checkout
+is a search of what the checkout holds.")
 (defvar mega-search-ignored nil "Non-nil to include files that are ignored.")
 (defvar mega-search-submodules nil
   "Non-nil to search the submodules of a checkout as well, with `git grep'.

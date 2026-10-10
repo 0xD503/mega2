@@ -147,7 +147,7 @@ brackets, how each starts out:
 
 | | git grep | ripgrep | grep |
 | --- | --- | --- | --- |
-| untracked files | `C-o u` (on) | always | always |
+| untracked files | `C-o u` (off) | always | always |
 | ignored files | `C-o i` (off) | `C-o i` (off) | always |
 | hidden files | always | `C-o h` (on) | `C-o h` (on) |
 | submodules | `C-o s` (off) | always | always |
@@ -156,7 +156,9 @@ With git grep, ignored files count as untracked, so `C-o i` brings both, and
 `C-o s` leaves both out. A key the current program cannot act on says so.
 
 **A dev container** starts in the background: Emacs stays yours while it
-does, and `*mega-container*` shows each step. Before anything from
+does, and the modeline says `[box: starting]` until it says `[box:NAME]`.
+Each step is written to the buffer `*mega-container*`, which is put in
+front of you only if a step fails. Before anything from
 `devcontainer.json` runs you are shown what will: every command, in order,
 and what is mounted from this machine. A file that asks for something MEGA
 cannot do, or does not know, is refused by name and not half-followed.

@@ -282,7 +282,11 @@ its top is what Emacs is pointed at.
   reader), show what it will do and wait for approval, then start: with
   `devcontainer up` if that CLI exists, else podman/docker directly. The
   start runs in the background, a step at a time, with a log; Emacs is
-  never held. Every key of the file is in one of three lists: acted on
+  never held. The log is a buffer and not a window: the modeline says
+  that a container is starting, and the log is put in front of you only
+  when a step has failed. (It used to open with the first step; with the
+  container offered at every opening of its project, that was a window to
+  close each time.) Every key of the file is in one of three lists: acted on
   (image, mounts, runArgs, capAdd, securityOpt, privileged, init, the
   environment, users, ports, the lifecycle commands), harmless to ignore,
   or impossible without the official CLI (build, features, compose).

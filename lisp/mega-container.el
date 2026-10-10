@@ -512,11 +512,28 @@ What the caller asks for through `mega-exec-environment' and
       (dolist (window follow)
         (set-window-point window (point-max))))))
 
-(defun mega-container--give-up (root reason)
-  "Stop starting the container of ROOT, and say REASON."
+(defun mega-container--show-log ()
+  "Show the container buffer in a window at the bottom, at its end.
+The steps of starting a container are written down as they are taken,
+and are worth a window when one of them has failed: not before."
+  (when-let* ((buffer (get-buffer mega-container-log-buffer))
+              (window (display-buffer
+                       buffer
+                       '((display-buffer-reuse-window display-buffer-in-side-window)
+                         (side . bottom) (window-height . 0.3)))))
+    (set-window-point window (with-current-buffer buffer (point-max)))))
+
+(defun mega-container--give-up (root reason &optional asked-for)
+  "Stop starting the container of ROOT, and say REASON.
+The steps taken so far are shown, unless this was ASKED-FOR: then you
+know why it stopped."
   (setq mega-container--starting (assoc-delete-all root mega-container--starting))
   (mega-container--log (format "\n%s\n" reason))
-  (message "%s (see %s)" reason mega-container-log-buffer))
+  (force-mode-line-update t)
+  (if asked-for
+      (message "%s" reason)
+    (mega-container--show-log)
+    (message "%s (see %s)" reason mega-container-log-buffer)))
 
 (defun mega-container--step (root description program args directory then)
   "Run PROGRAM with ARGS in DIRECTORY as one step of starting ROOT's container.
@@ -783,9 +800,16 @@ This is what `mega-exec' asks; see the Commentary of mega-exec.el."
 (add-hook 'mega-exec-context-functions #'mega-container-context)
 
 (defun mega-container--modeline ()
-  "Say in the modeline that this buffer's tools run in a container."
-  (when-let* ((entry (and mega-container--attached (mega-container-attached))))
-    (format " [box:%s]" (plist-get (cdr entry) :name))))
+  "Say in the modeline that this buffer's tools run in a container.
+Or that the container is on its way: starting one can take a while, and
+this is where it shows meanwhile."
+  (cond ((when-let* ((entry (and mega-container--attached (mega-container-attached))))
+           (format " [box:%s]" (plist-get (cdr entry) :name))))
+        ((and mega-container--starting
+              (let ((directory (expand-file-name default-directory)))
+                (seq-some (lambda (entry) (string-prefix-p (car entry) directory))
+                          mega-container--starting)))
+         " [box: starting]")))
 
 (add-to-list 'mode-line-misc-info '(:eval (mega-container--modeline)) t)
 
@@ -901,8 +925,10 @@ run and asks then, as it always does: that is the question."
 ;;;###autoload
 (defun mega-container-up ()
   "Start the project's dev container, or join it, and run its tools there.
-What can be asked is asked now; the rest happens in the background, and
-a window shows it."
+What can be asked is asked now; the rest happens in the background.
+The modeline says that it is starting, each step is written to the
+buffer `mega-container-log-buffer', and that buffer is shown if a step
+fails: only then."
   (interactive)
   (let* ((root (mega-container--root))
          (file (or (mega-container-config-file root)
@@ -920,10 +946,8 @@ a window shows it."
     (unless (mega-container-approve file plan cli)
       (user-error "Not started"))
     (push (cons root nil) mega-container--starting)
-    (display-buffer (mega-container--show
-                     (format "Starting the container of %s" (plist-get plan :name)))
-                    '((display-buffer-reuse-window display-buffer-in-side-window)
-                      (side . bottom) (window-height . 0.3)))
+    (mega-container--show (format "Starting the container of %s" (plist-get plan :name)))
+    (force-mode-line-update t)
     (message "Starting the container of %s in the background..." (plist-get plan :name))
     (condition-case err
         (if cli
@@ -949,7 +973,7 @@ The container itself is left running."
   (interactive)
   (if-let* ((starting (assoc (mega-container--root) mega-container--starting)))
       (let ((process (cdr starting)))
-        (mega-container--give-up (car starting) "Given up starting the container")
+        (mega-container--give-up (car starting) "Given up starting the container" t)
         (when (processp process)
           (mega-exec-stop process)))
     (let* ((entry (or (mega-container-attached)

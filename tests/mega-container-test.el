@@ -751,6 +751,60 @@ that of wherever the cursor happens to be."
   (cl-letf (((symbol-function 'mega-exe-p) (lambda (_) nil)))
     (should-not (mega-container-engine))))
 
+;;;; The window with the steps
+
+(ert-deftest mega-container-starting-shows-no-window-unless-it-fails ()
+  "Reported from use: a window opened at the bottom at every start."
+  (mega-container-test--project
+    (let ((messages nil)
+          (inhibit-message nil))
+      (cl-letf (((symbol-function 'message)
+                 (lambda (format-string &rest arguments)
+                   (push (apply #'format format-string arguments) messages))))
+        (mega-container-up)
+        ;; On its way: no window, and the modeline says so meanwhile.
+        (should-not (get-buffer-window mega-container-log-buffer))
+        (should (equal (mega-container--modeline) " [box: starting]"))
+        (should (mega-test-wait-for
+                 (lambda () (not (assoc dir mega-container--starting))) 30))
+        ;; There: still no window.  The steps are kept all the same.
+        (should (mega-container-attached dir))
+        (should-not (get-buffer-window mega-container-log-buffer))
+        (should (equal (mega-container--modeline) " [box:riscvmulator]"))
+        (should (string-match-p "now run in its container" (mega-container-test--shown)))
+        (should (seq-some (lambda (said) (string-match-p "now run in its container" said))
+                          messages))))))
+
+(ert-deftest mega-container-a-start-that-fails-shows-what-was-done ()
+  (mega-container-test--project
+    (set-file-modes (mega-test-write (expand-file-name "bin/just" dir)
+                                     "#!/bin/sh" "echo 'no such recipe' >&2" "exit 2" "")
+                    #o755)
+    (mega-container-test--up dir)
+    (should-not (mega-container-attached dir))
+    (should-not (mega-container--modeline))
+    ;; Now the window is worth having, and it is at the end, where the
+    ;; reason is.
+    (let ((window (get-buffer-window mega-container-log-buffer)))
+      (should window)
+      (should (= (window-point window)
+                 (with-current-buffer mega-container-log-buffer (point-max))))
+      (should (string-match-p "no such recipe" (mega-container-test--shown))))))
+
+(ert-deftest mega-container-giving-up-yourself-shows-no-window ()
+  "You know why it stopped."
+  (mega-container-test--project
+    ;; A first step that does not end by itself.
+    (set-file-modes (mega-test-write (expand-file-name "bin/just" dir)
+                                     "#!/bin/sh" "sleep 30" "")
+                    #o755)
+    (mega-container-up)
+    (should (assoc dir mega-container--starting))
+    (mega-container-stop)
+    (should-not (assoc dir mega-container--starting))
+    (should-not (get-buffer-window mega-container-log-buffer))
+    (should-not (mega-container--modeline))))
+
 ;;;; When a project is opened
 
 (defmacro mega-container-test--offering (&rest body)
