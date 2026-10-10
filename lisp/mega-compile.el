@@ -183,14 +183,20 @@ QUIET non-nil means nobody is waiting to hear."
           (ignore-errors (delete-file (mega-compile--failure-file)))
           (message "MEGA: its Lisp is compiled; the next start uses that"))
       (let ((reason (string-trim
-                     (concat (plist-get result :error) "\n" (plist-get result :output)))))
-        (with-temp-file (mega-compile--failure-file)
-          (insert fingerprint "\n"
-                  (if (plist-get result :stopped)
-                      (format "It was stopped (%s)." (plist-get result :stopped))
-                    "")
-                  ;; The end of it: that is where the reason is.
-                  (substring reason (max 0 (- (length reason) 2000)))))
+                     (concat (plist-get result :error) "\n" (plist-get result :output))))
+            (note (mega-compile--failure-file)))
+        ;; The note lies beside the copies, in a directory that the first
+        ;; copy makes: so before any was made there is none.  Without the
+        ;; note the same source would be tried again at every start.
+        (ignore-errors
+          (make-directory (file-name-directory note) t)
+          (with-temp-file note
+            (insert fingerprint "\n"
+                    (if (plist-get result :stopped)
+                        (format "It was stopped (%s)." (plist-get result :stopped))
+                      "")
+                    ;; The end of it: that is where the reason is.
+                    (substring reason (max 0 (- (length reason) 2000))))))
         (unless quiet
           (message "MEGA: its Lisp could not be compiled; M-x mega-doctor says why"))))))
 
@@ -261,12 +267,18 @@ to, and the same source has not failed to compile before."
   (when (mega-compile--wanted-p)
     (mega-compile-start :quiet)))
 
-;; A few seconds after Emacs is on screen: nothing of this is in the way of
-;; the first key.
+(defun mega-compile--schedule ()
+  "Have this session make the copy once it has had nothing to do for a while.
+Three seconds: nothing of this is in the way of the first key.  A
+session in which no three seconds pass without one leaves it to the
+next."
+  (run-with-idle-timer 3 nil #'mega-compile--when-idle))
+
+;; Set going here, when this file is loaded, and not from the hook Emacs
+;; runs when it has started: a function on that hook runs only if every one
+;; before it came to its end, and this must not depend on that.
 (unless noninteractive
-  (add-hook 'emacs-startup-hook
-            (lambda () (run-with-idle-timer 3 nil #'mega-compile--when-idle))
-            100))
+  (mega-compile--schedule))
 
 ;;;; The doctor
 

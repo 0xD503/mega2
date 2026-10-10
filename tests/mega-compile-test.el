@@ -475,6 +475,43 @@ is more settings, each NAME=VALUE."
       (should-not mega-compile--made)
       (should (mega-compile--failure)))))
 
+(ert-deftest mega-compile-a-failure-is-kept-where-no-copy-was-ever-made ()
+  "The note lies beside the copies, in a directory the first copy makes."
+  (mega-test-with-directory dir
+    (let ((mega-compiled-dir (expand-file-name "compiled/0123456789ab/" dir))
+          (mega-compile--process nil)
+          (mega-compile--made nil)
+          (scratch (expand-file-name "scratch/" dir))
+          (inhibit-message t))
+      (make-directory scratch)
+      (should-not (file-exists-p (expand-file-name "compiled" dir)))
+      (mega-compile--finished
+       (list :status 1 :output "" :error "mega-broken.el did not compile\n")
+       "the-fingerprint" scratch t)
+      (should (equal (mega-compile--failure)
+                     '("the-fingerprint" . "mega-broken.el did not compile")))
+      ;; And where it cannot be written at all, nothing else goes wrong.
+      (let ((mega-compiled-dir "/nonexistent-dir/proc/compiled/0123456789ab/"))
+        (make-directory scratch t)
+        (mega-compile--finished (list :status 1 :output "" :error "x")
+                                "the-fingerprint" scratch t)
+        (should-not (file-exists-p scratch))))))
+
+(ert-deftest mega-compile-is-set-going-whatever-else-happens-at-startup ()
+  "A function on the startup hook runs only if every one before it ends well."
+  (let ((noninteractive nil)
+        (timer-idle-list nil))
+    (mega-compile--schedule)
+    (should (= (length timer-idle-list) 1))
+    (should (eq (timer--function (car timer-idle-list)) #'mega-compile--when-idle))
+    ;; Once, a few seconds into having nothing to do.
+    (should-not (timer--repeat-delay (car timer-idle-list))))
+  (with-temp-buffer
+    (insert-file-contents (expand-file-name "mega-compile.el" mega-lisp-dir))
+    (should (re-search-forward "^(unless noninteractive\n  (mega-compile--schedule))" nil t))
+    (goto-char (point-min))
+    (should-not (re-search-forward "(add-hook 'emacs-startup-hook" nil t))))
+
 (ert-deftest mega-compile-the-doctor-says-what-this-session-runs ()
   (let ((process-environment (cons "MEGA_SOURCE=" process-environment)))
     (pcase-let ((`(,native ,byte ,source) (mega-compile-forms)))
