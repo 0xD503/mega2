@@ -527,25 +527,28 @@ stage_terminal() {
 
     # As ~/.emacs.d itself, with nothing to start it but Emacs: how MEGA is
     # used where neither git nor an installer of any kind is to be had.  A
-    # copy of the three things Emacs loads, and of nothing else.  Emacs
-    # writes into ~/.emacs.d by habit, and here that is the configuration:
-    # it must be exactly as it was afterwards.
-    mkdir -- "$HOME/.emacs.d" &&
-        cp -R -- "$CONFIG/early-init.el" "$CONFIG/init.el" "$CONFIG/lisp" "$HOME/.emacs.d/"
-    home_before=$(cd -- "$HOME/.emacs.d" && find . | LC_ALL=C sort | cksum)
+    # copy of the three things Emacs loads, and of nothing else, in a home
+    # of its own: the other stages run Emacs without a configuration, and
+    # that Emacs has been writing into the ~/.emacs.d of the sandbox.
+    # Emacs writes there by habit, and here that is the configuration: it
+    # must be exactly as it was afterwards.
+    bare="$SANDBOX/bare-home"
+    mkdir -- "$bare" "$bare/.emacs.d" &&
+        cp -R -- "$CONFIG/early-init.el" "$CONFIG/init.el" "$CONFIG/lisp" "$bare/.emacs.d/"
+    bare_before=$(cd -- "$bare/.emacs.d" && find . | LC_ALL=C sort | cksum)
     (
-        MEGA_TEST_CONFIG="$HOME/.emacs.d"
-        export MEGA_TEST_CONFIG
+        HOME=$bare
+        MEGA_TEST_CONFIG="$bare/.emacs.d"
+        export HOME MEGA_TEST_CONFIG
         terminal_run "$EMACS" xterm-256color 16777216 supported home
         exit "$failed"
     )
     failed=$?
-    home_after=$(cd -- "$HOME/.emacs.d" && find . | LC_ALL=C sort | cksum)
-    if [ "$home_before" != "$home_after" ]; then
+    bare_after=$(cd -- "$bare/.emacs.d" && find . | LC_ALL=C sort | cksum)
+    if [ "$bare_before" != "$bare_after" ]; then
         bad "terminal  as ~/.emacs.d itself, something was written into it"
-        (cd -- "$HOME/.emacs.d" && find . -newer "$SANDBOX/launch.sh" | cut -c1-200) | detail
+        (cd -- "$bare/.emacs.d" && find . -newer "$SANDBOX/launch.sh" | cut -c1-200) | detail
     fi
-    rm -rf -- "$HOME/.emacs.d"
 
     # Through chemacs2, as the default profile.  A copy of the real one is
     # put in the sandbox home; its profile list points at this checkout.
