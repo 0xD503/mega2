@@ -16,6 +16,16 @@ emacs --init-directory ~/.mega2.d
 With [chemacs2](https://github.com/plexus/chemacs2), name `~/.mega2.d` as
 the default profile and plain `emacs` starts it.
 
+**Anywhere else, and without git.** MEGA is three things: `early-init.el`,
+`init.el` and the directory `lisp`. Put them in any directory and point
+Emacs at it, or put them in `~/.emacs.d` and start plain `emacs`; no
+installer and no profile switcher is needed, and they can be copied over
+from another machine. MEGA finds its files from where they lie and writes
+nothing there, `~/.emacs.d` included. What it remembers and builds goes
+under `~/.local/state/mega2`, `~/.cache/mega2` and `~/.local/share/mega2`,
+or where `XDG_STATE_HOME`, `XDG_CACHE_HOME` and `XDG_DATA_HOME` say. It
+needs Emacs 31.1; an older one says so and stays a plain Emacs.
+
 To update, `git -C ~/.mega2.d pull --ff-only`, and restart Emacs: a running
 one goes on with the version it loaded. Updating is safe to do at any time.
 Git leaves the directory holding exactly the new version's files, and your

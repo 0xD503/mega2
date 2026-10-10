@@ -350,7 +350,7 @@ and a sixth when it is asked for by name:
 | unit | The ERT suite, twice: on MEGA's Lisp as source and on its compiled copy, each against a session started from the real init files. A test that waits for something that never comes is stopped and Emacs says where it was waiting |
 | boot | Startup, from source and from the compiled copy, fails no module, runs no program, opens no connection, and fits the time budget, what is put off until Emacs has started included |
 | bench | What a person waits for, each against what it is expected to take: a keystroke, the modeline, the completion menu, listing and matching files, search, save, undo history and tree, debugger messages, first use of a module and of a language server |
-| terminal | Real sessions in a pseudo-terminal: 24-bit, 256 and 8 colours, under a tmux terminal type, through chemacs2, and an old Emacs being refused. And four starts in a row on one cache, as after an update: the first makes the compiled copy, the second runs from it, the third waits while Emacs compiles that to native code, the fourth is native from its first moment |
+| terminal | Real sessions in a pseudo-terminal: 24-bit, 256 and 8 colours, under a tmux terminal type, as a bare copy in `~/.emacs.d`, through chemacs2, and an old Emacs being refused. And four starts in a row on one cache, as after an update: the first makes the compiled copy, the second runs from it, the third waits while Emacs compiles that to native code, the fourth is native from its first moment |
 | container | Only with `MEGA_REAL_IMAGE` set and named on the command line. A real container, started by podman from a `devcontainer.json` with no network and removed afterwards: programs run and a project built in it, and a program debugged with each debugger the image has, through the adapter client and through its console |
 
 Afterwards the configuration directory must be byte-for-byte what it was.
@@ -489,6 +489,13 @@ as a directory of its author's dotfiles and was moved out with its
 history: each commit from before the move ends in a `Dotfiles-commit:`
 line naming the commit it was there, and in those commits the files are
 where they were then, under `.mega2.d/` and `tests/mega2/`.
+
+Neither git nor an installer is needed to run it. MEGA is three things,
+`early-init.el`, `init.el` and `lisp/`, and it finds the others from where
+`early-init.el` lies: so a copy of them works in any directory Emacs is
+pointed at, and in `~/.emacs.d` with nothing to start it but Emacs. The
+terminal stage runs it that way and checks that nothing was written into
+`~/.emacs.d`, which is where Emacs writes by habit.
 
 What makes an update safe on MEGA's side is that nothing it keeps is
 trusted on the way back in: the trust store, workspaces, undo histories and

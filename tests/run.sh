@@ -17,8 +17,9 @@
 #             fails.  The expected times, and the commit and reason behind
 #             each, are in tests/mega-bench-history.eld, which also
 #             says what to do when one is exceeded.
-#   terminal  start it for real in a pseudo-terminal: directly, through
-#             chemacs2 if you have it, and with a too-old Emacs if one exists
+#   terminal  start it for real in a pseudo-terminal: directly, as a copy
+#             in ~/.emacs.d, through chemacs2 if you have it, and with a
+#             too-old Emacs if one exists
 #
 #   container start a real container with podman and use it: run, build and
 #             debug in it.  Needs MEGA_REAL_IMAGE; makes one container, with
@@ -380,7 +381,12 @@ terminal_run() {
     export T_EMACS T_PROBE MEGA_TEST_REPORT MEGA_TEST_EXPECT MEGA_TEST_LAUNCHER
     export MEGA_TEST_COLOURS
     rm -f -- "$MEGA_TEST_REPORT"
-    label="terminal  Emacs $("$T_EMACS" --version | sed -n '1s/^GNU Emacs //p'), TERM=$T_TERM${T_LAUNCHER:+, via $T_LAUNCHER}"
+    label="terminal  Emacs $("$T_EMACS" --version | sed -n '1s/^GNU Emacs //p'), TERM=$T_TERM"
+    case $T_LAUNCHER in
+        '') ;;
+        home) label="$label, copied to ~/.emacs.d" ;;
+        *) label="$label, via $T_LAUNCHER" ;;
+    esac
 
     # 24-bit colour is announced by COLORTERM, not by the terminal type.
     if [ "$MEGA_TEST_COLOURS" = 16777216 ]; then
@@ -399,7 +405,9 @@ terminal_run() {
         native-wait) label="$label, while Emacs compiles that to native code" ;;
         native)      label="$label, as native code" ;;
     esac
-    if [ "$T_LAUNCHER" = chemacs ]; then
+    # Through chemacs2 or as ~/.emacs.d itself, Emacs is told nothing: it
+    # finds its configuration where it always looks.
+    if [ -n "$T_LAUNCHER" ]; then
         launch='exec "$T_EMACS" -nw -l "$T_PROBE" ${MEGA_TEST_FILE:+"$MEGA_TEST_FILE"}'
     else
         launch='exec "$T_EMACS" -nw --init-directory "$MEGA_TEST_CONFIG" -l "$T_PROBE" ${MEGA_TEST_FILE:+"$MEGA_TEST_FILE"}'
@@ -516,6 +524,28 @@ stage_terminal() {
     )
     failed=$?
     MEGA_TEST_FORM=
+
+    # As ~/.emacs.d itself, with nothing to start it but Emacs: how MEGA is
+    # used where neither git nor an installer of any kind is to be had.  A
+    # copy of the three things Emacs loads, and of nothing else.  Emacs
+    # writes into ~/.emacs.d by habit, and here that is the configuration:
+    # it must be exactly as it was afterwards.
+    mkdir -- "$HOME/.emacs.d" &&
+        cp -R -- "$CONFIG/early-init.el" "$CONFIG/init.el" "$CONFIG/lisp" "$HOME/.emacs.d/"
+    home_before=$(cd -- "$HOME/.emacs.d" && find . | LC_ALL=C sort | cksum)
+    (
+        MEGA_TEST_CONFIG="$HOME/.emacs.d"
+        export MEGA_TEST_CONFIG
+        terminal_run "$EMACS" xterm-256color 16777216 supported home
+        exit "$failed"
+    )
+    failed=$?
+    home_after=$(cd -- "$HOME/.emacs.d" && find . | LC_ALL=C sort | cksum)
+    if [ "$home_before" != "$home_after" ]; then
+        bad "terminal  as ~/.emacs.d itself, something was written into it"
+        (cd -- "$HOME/.emacs.d" && find . -newer "$SANDBOX/launch.sh" | cut -c1-200) | detail
+    fi
+    rm -rf -- "$HOME/.emacs.d"
 
     # Through chemacs2, as the default profile.  A copy of the real one is
     # put in the sandbox home; its profile list points at this checkout.
