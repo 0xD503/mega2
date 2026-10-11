@@ -218,5 +218,46 @@ that must not mean searching for the hit itself."
     (let ((max-mini-window-height 1))
       (should (= (mega-minibuffer-page) 1)))))
 
+(ert-deftest mega-pick-an-open-prompt-can-be-made-to-say-something-else ()
+  "The words on screen change; what the minibuffer holds does not."
+  ;; A buffer of Emacs's own that it takes for a prompt, made up as an open
+  ;; one is: the words, as a field, and after them what was typed.
+  (with-current-buffer (get-buffer-create " *Minibuf-0*")
+    (unwind-protect
+        (let ((inhibit-read-only t))
+          (erase-buffer)
+          (insert (propertize "Find [one]: " 'field t 'rear-nonsticky t) "typed")
+          (should (= (minibuffer-prompt-end) 13))
+          (mega-pick-say "Find [two]: ")
+          (let ((said (car (overlays-in (point-min) (point-max)))))
+            (should (equal (overlay-start said) 1))
+            (should (equal (overlay-end said) 13))
+            (should (equal (overlay-get said 'display) "Find [two]: "))
+            (should (eq (get-text-property 0 'face (overlay-get said 'display))
+                        'minibuffer-prompt))
+            ;; Again: the same overlay says the next thing.
+            (mega-pick-say "Find [three]: ")
+            (should (equal (overlays-in (point-min) (point-max)) (list said)))
+            (should (equal (overlay-get said 'display) "Find [three]: "))
+            ;; What is typed next is no part of it.
+            (goto-char (point-max))
+            (insert " more")
+            (goto-char 13)
+            (insert "x")
+            (should (equal (overlay-end said) 13)))
+          (should (equal (buffer-string) "Find [one]: xtyped more"))
+          (should (equal (minibuffer-contents-no-properties) "xtyped more"))
+          ;; The prompt closes, and nothing of it is left for the next.
+          (erase-buffer)
+          (should-not (overlays-in (point-min) (point-max))))
+      (let ((inhibit-read-only t))
+        (erase-buffer))
+      (kill-local-variable 'mega-pick--said)))
+  ;; Anywhere else there is no prompt to change.
+  (with-temp-buffer
+    (insert "text")
+    (mega-pick-say "Find: ")
+    (should-not (overlays-in (point-min) (point-max)))))
+
 (provide 'mega-pick-test)
 ;;; mega-pick-test.el ends here

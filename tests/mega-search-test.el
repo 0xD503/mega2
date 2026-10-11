@@ -307,31 +307,46 @@ holds each to what the table says of it."
 (ert-deftest mega-search-a-key-the-program-cannot-act-on-says-so ()
   "Never a key that does nothing without a word; and it is remembered."
   (mega-search-test--defaults
-    (let ((said nil))
+    (let ((mega-search--directory "/home/u/src/proj/")
+          (prompt nil)
+          (said nil))
       (cl-letf (((symbol-function 'mega-pick-refresh) #'ignore)
+                ((symbol-function 'mega-pick-say)
+                 (lambda (words) (setq prompt words)))
                 ((symbol-function 'minibuffer-message)
                  (lambda (format &rest arguments)
-                   (setq said (apply #'format format arguments)))))
+                   (push (cons (apply #'format format arguments)
+                               minibuffer-message-timeout)
+                         said))))
         (let ((mega-search--backend 'rg))
           (mega-search-toggle-untracked)
           (should mega-search-untracked)
-          (should (string-match-p "\\`\\[rg  case:smart \\+hidden\\]  ripgrep cannot tell untracked"
-                                  said))
-          ;; One it does act on: just the settings.
+          ;; The prompt says what it said, and why is said beside it: not
+          ;; for the two seconds Emacs gives such a note, which is gone
+          ;; before it is read, but until the next key.
+          (should (string-search "[rg  case:smart +hidden]" prompt))
+          (should (equal (length said) 1))
+          (should (string-prefix-p "ripgrep cannot tell untracked" (car (car said))))
+          (should-not (cdr (car said)))
+          ;; One it does act on: the prompt has it, and there is no more to say.
           (mega-search-toggle-hidden)
-          (should (equal said "[rg  case:smart]"))
+          (should (string-search "[rg  case:smart]" prompt))
+          (should (equal (length said) 1))
           (mega-search-toggle-submodules)
-          (should (string-match-p "goes into a submodule" said)))
+          (should (string-match-p "goes into a submodule" (car (car said)))))
         (let ((mega-search--backend 'grep))
           (mega-search-toggle-ignored)
-          (should (string-match-p "grep knows no ignore files" said)))
+          (should (string-match-p "grep knows no ignore files" (car (car said)))))
         (let ((mega-search--backend 'git))
           (mega-search-toggle-hidden)
-          (should (string-match-p "git grep searches hidden files always" said))
+          (should (string-match-p "git grep searches hidden files always"
+                                  (car (car said))))
           ;; What was pressed under ripgrep counts now that git is asked.
-          (should (string-match-p "\\+submodules" said))
-          (mega-search-toggle-word)
-          (should-not (string-match-p "always\\|cannot" said)))))))
+          (should (string-search "+submodules" prompt))
+          (let ((before (length said)))
+            (mega-search-toggle-word)
+            (should (string-search " words]" prompt))
+            (should (equal (length said) before))))))))
 
 (ert-deftest mega-search-git-honours-case-word-and-literal ()
   (skip-unless (executable-find "git"))
@@ -453,7 +468,8 @@ holds each to what the table says of it."
         (cl-letf (((symbol-function 'mega-pick-read)
                    (lambda (prompt &rest _) (setq asked prompt) "")))
           (mega-search-project))
-        (should (string-match-p " with grep (C-o \\? for options): \\'" asked))))))
+        (should (string-match-p " \\[grep  case:smart[^]]*\\] (C-o \\? for keys): \\'"
+                                asked))))))
 
 (ert-deftest mega-search-submodules-or-untracked-files-never-both ()
   "As the user's own aliases have it: gs searches submodules, g does not.
@@ -525,6 +541,75 @@ And git refuses --recurse-submodules together with --untracked."
 (ert-deftest mega-search-every-setting-key-is-bound-after-C-o ()
   (dolist (key '("c" "u" "i" "s" "h" "l" "w" "b" "e" "?"))
     (should (commandp (lookup-key mega-search-map (kbd (concat "C-o " key)))))))
+
+(ert-deftest mega-search-the-prompt-says-how-the-search-is-set ()
+  "Asked for after use: C-o ? showed the settings, and too briefly to read.
+They are in the prompt now, for as long as it is open."
+  (mega-search-test--defaults
+    (let ((mega-search--directory "/home/u/src/proj/")
+          (mega-search--backend 'git)
+          (inhibit-message t)
+          said refreshed)
+      ;; What the prompt opens with is how the search is set then.
+      (let ((mega-search-case 'sensitive)
+            (mega-search-untracked t)
+            (mega-search-word t))
+        (should (equal (mega-search-prompt "/home/u/src/proj/" 'git)
+                       (concat "Search proj [git  case:sensitive +untracked words]"
+                               " (C-o ? for keys): "))))
+      ;; And every key that changes a setting has the prompt say the new one,
+      ;; after the list has been asked for again.
+      (cl-letf (((symbol-function 'mega-pick-say)
+                 (lambda (prompt) (push (cons prompt refreshed) said)))
+                ((symbol-function 'mega-pick-refresh)
+                 (lambda () (setq refreshed t))))
+        (mega-search-cycle-case)
+        (should (equal (pop said)
+                       '("Search proj [git  case:ignore] (C-o ? for keys): " . t)))
+        (mega-search-toggle-literal)
+        (should (equal (car (pop said))
+                       "Search proj [git  case:ignore literal] (C-o ? for keys): "))
+        (mega-search-toggle-untracked)
+        (should (string-search "+untracked literal]" (car (pop said))))
+        ;; A program that is switched to is named there as well.
+        (cl-letf (((symbol-function 'mega-search--usable-p)
+                   (lambda (backend _directory) (memq backend '(git rg)))))
+          (mega-search-cycle-backend))
+        (should (string-prefix-p "Search proj [rg  case:ignore" (car (pop said))))
+        (should-not said)))))
+
+(ert-deftest mega-search-C-o-?-lists-the-keys-there-are ()
+  (let (notes)
+    (cl-letf (((symbol-function 'minibuffer-message)
+               (lambda (format &rest arguments)
+                 (push (cons (apply #'format format arguments)
+                             minibuffer-message-timeout)
+                       notes))))
+      (mega-search-show-keys))
+    (should (equal (length notes) 1))
+    (should-not (cdr (car notes)))
+    ;; Every key that follows C-o is in the list, with a word for it, and
+    ;; nothing is in the list that is not a key.
+    (let ((bound nil))
+      (map-keymap (lambda (key command)
+                    (unless (eq command 'mega-search-show-keys)
+                      (push (cons (string key) command) bound)))
+                  mega-search-options-map)
+      (should (equal (sort (mapcar #'car bound) #'string<)
+                     (sort (mapcar #'car mega-search-option-keys) #'string<)))
+      (dolist (key mega-search-option-keys)
+        (should (eq (cdr (assoc (car key) bound)) (nth 1 key)))
+        (should (commandp (nth 1 key)))
+        (should (string-search (format "%s %s" (car key) (nth 2 key))
+                               (car (car notes))))))
+    ;; The words are the prompt's own, for the settings it names.
+    (mega-search-test--defaults
+      (let ((mega-search--backend 'git)
+            (mega-search-untracked t) (mega-search-literal t) (mega-search-word t))
+        (dolist (word '("case" "untracked" "literal" "words"))
+          (should (assoc word (mapcar (lambda (key) (list (nth 2 key)))
+                                      mega-search-option-keys)))
+          (should (string-search word (mega-search-describe))))))))
 
 (ert-deftest mega-search-the-description-names-what-is-on ()
   (mega-search-test--defaults
@@ -667,13 +752,14 @@ And git refuses --recurse-submodules together with --untracked."
 (ert-deftest mega-search-the-prompt-says-where-its-settings-are ()
   "Reported from use: C-o, pressed where the guide did not say it had to be,
 opened a line.  The keys are the prompt's, and the prompt is where to say so."
-  (let ((prompt (mega-search-prompt "/home/u/src/proj/" 'git)))
-    (should (equal prompt "Search proj with git grep (C-o ? for options): "))
-    ;; What it names is what the prompt really has.
-    (should (eq (lookup-key mega-search-map (kbd "C-o ?"))
-                'mega-search-show-settings)))
-  (should (string-match-p "with ripgrep (C-o"
-                          (mega-search-prompt "/home/u/src/proj" 'rg)))
+  (mega-search-test--defaults
+    (let ((prompt (mega-search-prompt "/home/u/src/proj/" 'git)))
+      (should (equal prompt "Search proj [git  case:smart] (C-o ? for keys): "))
+      ;; What it names is what the prompt really has.
+      (should (eq (lookup-key mega-search-map (kbd "C-o ?"))
+                  'mega-search-show-keys)))
+    (should (string-match-p "\\[rg  case:smart[^]]*\\] (C-o"
+                            (mega-search-prompt "/home/u/src/proj" 'rg))))
   ;; Outside the prompt MEGA leaves the key to Emacs.
   (should-not (lookup-key mega-keys-mode-map (kbd "C-o"))))
 

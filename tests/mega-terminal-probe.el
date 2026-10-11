@@ -141,6 +141,68 @@ minibuffer list on: the keys are simply waiting in the input queue."
                                           (or buffer-file-name (buffer-name))
                                           (line-number-at-pos))))
       (error (mega-terminal-probe--problem "the search failed: %S" err))))
+  ;; The prompt says how the search is set, and goes on saying so while the
+  ;; settings are changed with its keys: here the case, three times, which
+  ;; is once round.  What is typed stays as it is, the keys are listed for
+  ;; as long as nothing is pressed, and the search still ends on its hit.
+  (let* ((project (file-name-as-directory
+                   (make-temp-file (expand-file-name "probe-" (getenv "MEGA_TEST_SANDBOX"))
+                                   t)))
+         (file (expand-file-name "notes.txt" project))
+         (default-directory project)
+         (said nil)
+         (listed nil)
+         (say (lambda (&rest _)
+                (push (list (substring-no-properties
+                             (or (overlay-get mega-pick--said 'display) ""))
+                            (buffer-substring-no-properties
+                             (point-min) (minibuffer-prompt-end))
+                            (minibuffer-contents-no-properties))
+                      said)))
+         (list-keys (lambda (&rest _)
+                      (setq listed
+                            (list (substring-no-properties
+                                   (or (overlay-get minibuffer--message-overlay
+                                                    'after-string)
+                                       ""))
+                                  (and (timerp minibuffer--message-timer)
+                                       (- (float-time
+                                           (timer--time minibuffer--message-timer))
+                                          (float-time))))))))
+    (with-temp-file file (insert "one\ntwo\nthe needle is here\n"))
+    (advice-add 'mega-pick-say :after say)
+    (advice-add 'mega-search-show-keys :after list-keys)
+    (unwind-protect
+        (condition-case err
+            (save-window-excursion
+              (mega-terminal-probe--typing "needle C-o c C-o c C-o c C-o ? RET"
+                (mega-search-project))
+              (unless (and (equal buffer-file-name file) (= (line-number-at-pos) 3))
+                (mega-terminal-probe--problem
+                 "after its settings were changed the search ended in %S, line %s"
+                 (or buffer-file-name (buffer-name)) (line-number-at-pos)))
+              (let ((prompts (mapcar #'car (reverse said))))
+                (unless (and (= (length prompts) 3)
+                             (string-search " case:ignore" (nth 0 prompts))
+                             (string-search " case:sensitive" (nth 1 prompts))
+                             (string-search " case:smart" (nth 2 prompts)))
+                  (mega-terminal-probe--problem
+                   "the search prompt said %S as its case was changed" prompts)))
+              (dolist (state said)
+                (unless (and (string-search " case:smart" (nth 1 state))
+                             (equal (nth 2 state) "needle"))
+                  (mega-terminal-probe--problem
+                   "changing a setting changed what the prompt holds: %S" (cdr state))))
+              (unless (and listed
+                           (string-search "c case" (car listed))
+                           (string-search "e export" (car listed))
+                           (numberp (nth 1 listed))
+                           (> (nth 1 listed) 3600))
+                (mega-terminal-probe--problem
+                 "C-o ? in the search prompt gave %S" listed)))
+          (error (mega-terminal-probe--problem "the search prompt failed: %S" err)))
+      (advice-remove 'mega-pick-say say)
+      (advice-remove 'mega-search-show-keys list-keys)))
   ;; A hit shown without being taken: C-j, in the real prompt, where the
   ;; list of choices has a meaning of its own for that key.  Two files with
   ;; a hit each; the search starts from a buffer that has nothing to do

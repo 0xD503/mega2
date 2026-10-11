@@ -150,11 +150,13 @@ searched from, its line in the middle and marked, with the prompt still open,
 so you can go down the list and look at the next. `C-g` then leaves
 everything as it was, and closes a file that was opened only to be shown.
 
-How it searches is changed in that prompt, while it is open and you are
-typing what to look for: `C-o` and then a letter. (Anywhere else `C-o` is
-Emacs's own key and opens a line.) `C-o ?` shows the settings; `C-o c`
-changes case, `w` whole words, `l` literal text, `e` exports the hits to an
-editable buffer. `C-o b` switches to ripgrep, then plain grep, then back,
+The prompt says how it searches: `[git  case:smart]` is git grep, case
+ignored unless you type a capital, and anything else that is on is named
+after it. That is changed in the prompt, while it is open and you are typing
+what to look for: `C-o` and then a letter, and the prompt says the new
+setting at once. (Anywhere else `C-o` is Emacs's own key and opens a line.)
+`C-o ?` lists the keys; `C-o c` changes case, `w` whole words, `l` literal
+text, `e` exports the hits to an editable buffer. `C-o b` switches to ripgrep, then plain grep, then back,
 and the session stays with what you chose; `(setq mega-search-backend 'rg)`
 in `local.el` makes ripgrep the one to start with. `needle -- src/*.rs`
 searches part of the project.

@@ -155,7 +155,7 @@ keymap in step.")
      ("C-o w" mega-search-toggle-word      "Whole words only, or anywhere")
      ("C-o b" mega-search-cycle-backend    "Switch program: git grep, ripgrep, grep; it stays")
      ("C-o e" mega-search-export           "Leave the prompt and put every hit in a buffer")
-     ("C-o ?" mega-search-show-settings    "Show how the search currently works"))
+     ("C-o ?" mega-search-show-keys        "List these keys; how the search is set is in the prompt"))
     ("In the undo tree" mega-undo-tree-mode-map mega-undo-tree
      ("b, <left>, C-b"  mega-undo-tree-backward        "The older state this one was made from")
      ("f, <right>, C-f" mega-undo-tree-forward         "The newer state made from this one")

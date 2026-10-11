@@ -18,8 +18,9 @@
 ;; next program, and the session stays with it; to start with another for
 ;; good, in local.el:   (setq mega-search-backend 'rg)
 ;;
-;; While the prompt is open, `C-o' followed by a letter changes how it
-;; searches, and the list updates in place:
+;; The prompt says how the search is set: which program, how case is
+;; treated, and whatever else is on.  While it is open, `C-o' followed by a
+;; letter changes that, and the prompt and the list update in place:
 ;;
 ;;   C-o c    case: smart -> ignore -> sensitive
 ;;   C-o u    include untracked files           (git)
@@ -30,7 +31,7 @@
 ;;   C-o w    match whole words only
 ;;   C-o b    switch to the next search program
 ;;   C-o e    put every hit in a buffer you can navigate and edit
-;;   C-o ?    show the current settings
+;;   C-o ?    list these keys
 ;;
 ;; And one key shows a hit without taking it:
 ;;
@@ -386,15 +387,22 @@ what a program does regardless is not a setting of it."
             (if mega-search-literal " literal" "")
             (if mega-search-word " words" ""))))
 
+(defun mega-search--say (text)
+  "Say TEXT in the open prompt, for as long as no key is pressed.
+Emacs takes such a message away after two seconds, which is before it
+has been read."
+  (let ((minibuffer-message-timeout nil))
+    (minibuffer-message "%s" text)))
+
 (defun mega-search--changed (&optional setting)
-  "Search again with the new settings, and say what they are.
+  "Search again with the new settings, and have the prompt say what they are.
 SETTING, if given, is the one that was changed: when the program in use
-cannot act on it, that is said too, so that a key never does nothing
-without a word."
+cannot act on it, the prompt says the same as before, and why is said
+beside it, so that a key never does nothing without a word."
   (mega-pick-refresh)
-  (let ((fixed (and setting (mega-search--fixed setting))))
-    (minibuffer-message (if fixed "[%s]  %s" "[%s]")
-                        (mega-search-describe) fixed)))
+  (mega-pick-say (mega-search-prompt mega-search--directory mega-search--backend))
+  (when-let* ((fixed (and setting (mega-search--fixed setting))))
+    (mega-search--say fixed)))
 
 (defmacro mega-search--define-toggle (name variable setting doc)
   "Define command NAME that flips VARIABLE, the setting called SETTING.
@@ -441,29 +449,40 @@ DOC is its docstring."
     (when next (setq mega-search-backend next)))
   (mega-search--changed))
 
-(defun mega-search-show-settings ()
-  "Show how the search currently works."
-  (interactive)
-  (minibuffer-message "[%s]" (mega-search-describe)))
-
 (defun mega-search-export ()
   "Leave the prompt and put every hit in a buffer."
   (interactive)
   (setq mega-search--export t)
   (exit-minibuffer))
 
+(defconst mega-search-option-keys
+  '(("c" mega-search-cycle-case "case")
+    ("u" mega-search-toggle-untracked "untracked")
+    ("i" mega-search-toggle-ignored "ignored")
+    ("s" mega-search-toggle-submodules "submodules")
+    ("h" mega-search-toggle-hidden "hidden")
+    ("l" mega-search-toggle-literal "literal")
+    ("w" mega-search-toggle-word "words")
+    ("b" mega-search-cycle-backend "program")
+    ("e" mega-search-export "export"))
+  "The keys that follow `C-o' in the search prompt, as (KEY COMMAND WORD).
+WORD is what the key is about, as the prompt itself puts it where it
+names that setting; `mega-search-show-keys' lists them.")
+
+(defun mega-search-show-keys ()
+  "List the keys that change how the search works.
+How it works at the moment is in the prompt."
+  (interactive)
+  (mega-search--say
+   (concat "C-o and then:  "
+           (mapconcat (lambda (key) (format "%s %s" (car key) (nth 2 key)))
+                      mega-search-option-keys "  "))))
+
 (defvar mega-search-options-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "c" #'mega-search-cycle-case)
-    (define-key map "u" #'mega-search-toggle-untracked)
-    (define-key map "i" #'mega-search-toggle-ignored)
-    (define-key map "s" #'mega-search-toggle-submodules)
-    (define-key map "h" #'mega-search-toggle-hidden)
-    (define-key map "l" #'mega-search-toggle-literal)
-    (define-key map "w" #'mega-search-toggle-word)
-    (define-key map "b" #'mega-search-cycle-backend)
-    (define-key map "e" #'mega-search-export)
-    (define-key map "?" #'mega-search-show-settings)
+    (dolist (key mega-search-option-keys)
+      (define-key map (car key) (nth 1 key)))
+    (define-key map "?" #'mega-search-show-keys)
     map)
   "What follows `C-o' in the search prompt.")
 
@@ -641,12 +660,13 @@ Commentary of mega-search.el for the keys of the prompt."
 
 (defun mega-search-prompt (directory backend)
   "What the prompt says for a search of DIRECTORY with BACKEND.
-Which project, which program, and where the settings are: the keys that
-change them mean something only while this prompt is open, and there
-is nowhere else to learn that at the moment it matters."
-  (format "Search %s with %s (C-o ? for options): "
+Which project, how the search is set at the moment, and where the keys
+are that change it: they mean something only while this prompt is open,
+and there is nowhere else to learn that at the moment it matters."
+  (format "Search %s [%s] (C-o ? for keys): "
           (file-name-nondirectory (directory-file-name directory))
-          (mega-search-backend-name backend)))
+          (let ((mega-search--backend backend))
+            (mega-search-describe))))
 
 ;;;###autoload
 (defun mega-search-symbol ()

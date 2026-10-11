@@ -97,6 +97,23 @@ For a command that changes how the source searches, such as a case toggle."
 
 ;;;; The prompt
 
+(defvar-local mega-pick--said nil
+  "The overlay that draws other words in place of the prompt's own, or nil.")
+
+(defun mega-pick-say (prompt)
+  "Have the open prompt read PROMPT from now on.
+For a prompt that says something which changes while it is open, such
+as how a search is set.  What the minibuffer holds is not touched: the
+new words are drawn in place of the ones the prompt was opened with.
+Outside a prompt this does nothing."
+  (when (minibufferp)
+    (unless (and (overlayp mega-pick--said) (overlay-buffer mega-pick--said))
+      (setq mega-pick--said (make-overlay (point-min) (minibuffer-prompt-end)))
+      ;; Gone with the prompt it was made for.
+      (overlay-put mega-pick--said 'evaporate t))
+    (overlay-put mega-pick--said 'display
+                 (propertize prompt 'face 'minibuffer-prompt))))
+
 (defvar mega-pick-selected-map
   (let ((map (make-sparse-keymap)))
     ;; Emacs has the first C-g only take a selection away, and the second
