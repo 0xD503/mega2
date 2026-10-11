@@ -155,6 +155,76 @@ The second file needs a macro of the first while it is compiled."
       ;; In the same place: what Emacs keeps for a file goes by its name.
       (should (equal (mega-compile-test--files (expand-file-name "out/" dir)) '("copy"))))))
 
+(ert-deftest mega-compile-a-copy-made-again-keeps-the-times-of-what-came-out-the-same ()
+  "Found in use: after `M-x mega-compile-now', and after every update,
+fewer functions ran as native code than before.  Emacs takes native
+code only if it is no older than the compiled file it stands for, and a
+copy made again had compiled files of that minute, every one."
+  (mega-compile-test--source
+    (let* ((long-ago (encode-time '(0 0 0 1 1 2001 nil nil t)))
+           (names '("probe-one.el" "probe-one.elc" "probe-two.el" "probe-two.elc")))
+      (cl-flet ((age (name)
+                  (float-time (file-attribute-modification-time
+                               (file-attributes (expand-file-name name target)))))
+                (make-again ()
+                  ;; As the other Emacs meets them: nothing of an earlier
+                  ;; build loaded, and what is there made long ago.
+                  (dolist (feature '(probe-two probe-one))
+                    (when (featurep feature) (unload-feature feature t)))
+                  (dolist (name names)
+                    (set-file-times (expand-file-name name target) long-ago))
+                  (mega-compile-build target source)))
+        (mega-compile-build target source)
+        ;; From the same source: every compiled file is what it was, and
+        ;; keeps the time it had.  So does the source beside it, which
+        ;; Emacs would otherwise call newer than its compiled file.
+        (make-again)
+        (dolist (name names)
+          (should (= (age name) (float-time long-ago))))
+        ;; One file changed, and nothing of it is taken by the other: that
+        ;; one is new, the other is as it was.
+        (mega-test-write (expand-file-name "probe-two.el" source)
+                         ";;; probe-two.el --- two  -*- lexical-binding: t; -*-"
+                         "(require 'probe-one)"
+                         "(defun probe-two (list) (probe-one-twice (push 3 list)) list)"
+                         "(provide 'probe-two)"
+                         "")
+        (make-again)
+        (should (= (age "probe-one.elc") (float-time long-ago)))
+        (should (> (age "probe-two.elc") (float-time long-ago)))
+        ;; A macro changed: the file that uses it has not changed a letter,
+        ;; and is another program now.  It does not keep its time, or old
+        ;; native code would go on running the old macro.
+        (mega-test-write (expand-file-name "probe-one.el" source)
+                         ";;; probe-one.el --- one  -*- lexical-binding: t; -*-"
+                         "(defmacro probe-one-twice (form) `(progn ,form ,form ,form))"
+                         "(defun probe-one () 1)"
+                         "(provide 'probe-one)"
+                         "")
+        (make-again)
+        (should (> (age "probe-one.elc") (float-time long-ago)))
+        (should (> (age "probe-two.elc") (float-time long-ago)))
+        ;; A comment changed: the same program, and the time it had.
+        (mega-test-write (expand-file-name "probe-one.el" source)
+                         ";;; probe-one.el --- one  -*- lexical-binding: t; -*-"
+                         ";; Three times now."
+                         "(defmacro probe-one-twice (form) `(progn ,form ,form ,form))"
+                         "(defun probe-one () 1)"
+                         "(provide 'probe-one)"
+                         "")
+        (make-again)
+        (should (= (age "probe-one.elc") (float-time long-ago)))
+        (should (string-search "Three times now"
+                               (mega-compile-test--contents
+                                (expand-file-name "probe-one.el" target))))
+        ;; Whatever was kept: no source is newer than its compiled file.
+        (should (<= (age "probe-one.el") (age "probe-one.elc")))
+        (should (<= (age "probe-two.el") (age "probe-two.elc")))
+        ;; And the copy is the copy of this source, as ever.
+        (should (equal (mega-compile-test--contents
+                        (expand-file-name "fingerprint" target))
+                       (mega-fingerprint target)))))))
+
 (ert-deftest mega-compile-what-a-build-that-died-left-is-cleared-away ()
   (mega-compile-test--source
     (let ((stale (expand-file-name "out/copy.new-dead/" dir))
@@ -526,8 +596,27 @@ is more settings, each NAME=VALUE."
                                   "this session runs +the compiled copy"
                                 "this session runs +the source")
                               (buffer-string)))
-      (should (string-match-p "[0-9]+ native, [0-9]+ compiled, [0-9]+ source"
+      (should (string-match-p "[0-9]+ native, [0-9]+ compiled, [0-9]+ source$"
                               (buffer-string))))
+    ;; While Emacs is still making native code, the count is not the last
+    ;; word, and the doctor says so.
+    (should (= (mega-compile--native-pending) 0))
+    (defvar comp-files-queue)
+    (defvar comp-async-compilations)
+    (let ((comp-files-queue '(("a.el") ("b.el")))
+          (comp-async-compilations (make-hash-table :test #'equal)))
+      (puthash "c.el" t comp-async-compilations)
+      (should (= (mega-compile--native-pending) 3))
+      (with-temp-buffer
+        (mega-compile--doctor)
+        (should (string-match-p
+                 "[0-9]+ source; Emacs is making native code of 3 more files$"
+                 (buffer-string)))))
+    (let ((comp-files-queue '(("a.el")))
+          (comp-async-compilations (make-hash-table :test #'equal)))
+      (with-temp-buffer
+        (mega-compile--doctor)
+        (should (string-match-p "native code of 1 more file$" (buffer-string)))))
     (mega-test-with-directory dir
       (let ((mega-compiled-dir (expand-file-name "copy/" dir))
             (mega-compiled-p nil)

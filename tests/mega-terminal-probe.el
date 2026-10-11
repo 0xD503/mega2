@@ -675,7 +675,7 @@ copy as native code.  Anything else: from source."
   (declare-function mega-compile-forms "mega-compile")
   (let ((compiled (not (interpreted-function-p (symbol-function 'mega-trust-p)))))
     (pcase (getenv "MEGA_TEST_FORM")
-      ((or "native" "native-wait")
+      ((or "native" "native-wait" "native-again" "remake")
        (pcase-let ((`(,native ,byte ,_source) (mega-compile-forms)))
          (unless (and mega-compiled-p
                       (native-comp-function-p (symbol-function 'mega-trust-p))
@@ -874,6 +874,26 @@ copy as native code.  Anything else: from source."
     (cancel-function-timers #'mega-terminal-probe--when-made)
     (mega-terminal-probe--report)))
 
+(defvar mega-terminal-probe--remaking nil
+  "Non-nil once this session has asked for its compiled copy again.")
+
+(defun mega-terminal-probe--when-remade ()
+  "Have the compiled copy made again, as a person does, and report then.
+`M-x mega-compile-now' in a session that runs from a copy already: the
+one made is of the same source."
+  (defvar mega-compile--made)
+  (declare-function mega-compile-now "mega-compile")
+  (setq mega-terminal-probe--waited (1+ mega-terminal-probe--waited))
+  (cond ((not mega-terminal-probe--remaking)
+         (setq mega-terminal-probe--remaking t
+               mega-compile--made nil)
+         (mega-compile-now))
+        ((or mega-compile--made (> mega-terminal-probe--waited 90))
+         (cancel-function-timers #'mega-terminal-probe--when-remade)
+         (unless mega-compile--made
+           (mega-terminal-probe--problem "the compiled copy was not made again"))
+         (mega-terminal-probe--report))))
+
 (defun mega-terminal-probe--when-native ()
   "Report once Emacs has no more of what it loaded left to compile.
 That is Emacs's own doing: a compiled file it loads, it compiles to
@@ -900,6 +920,7 @@ native code in the background.  The probe only waits for it."
             (pcase (getenv "MEGA_TEST_FORM")
               ("make" (run-with-timer 1 1 #'mega-terminal-probe--when-made))
               ("native-wait" (run-with-timer 1 1 #'mega-terminal-probe--when-native))
+              ("remake" (run-with-timer 1 1 #'mega-terminal-probe--when-remade))
               (_ (run-with-idle-timer 0.5 nil #'mega-terminal-probe--report))))
           100)
 

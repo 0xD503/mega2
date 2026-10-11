@@ -69,8 +69,11 @@ seconds with nothing to do, it compiles a copy in the background. Every
 start after that loads the copy, and Emacs turns what it loads into native
 code by itself, also in the background. The copy lives in `~/.cache/mega2`;
 nothing compiled is ever written to `~/.mega2.d`, which is to say into this
-repository. `M-x mega-doctor` says which form is running, under "MEGA's own
-Lisp", and `M-x mega-compile-now` makes the copy at once, for the next start.
+repository. After an update only the files that changed go through this
+again. `M-x mega-doctor` says which form is running, under "MEGA's own
+Lisp": how many functions are native, compiled or source, and whether Emacs
+is still making native code, in which case the count is on its way up.
+`M-x mega-compile-now` makes the copy at once, for the next start.
 
 ## Keys
 

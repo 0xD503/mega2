@@ -580,7 +580,14 @@ running Emacs did.
   takes what a session loads: the modules loaded at start in the first
   session (about a quarter of a minute of background work), one that loads
   on first use in the session that first uses it. The boot test switches
-  the JIT off to listen for MEGA alone.
+  the JIT off to listen for MEGA alone. Emacs takes a native file only if
+  it is no older than the compiled file it stands for, so a copy that is
+  made again keeps the time of every compiled file that came out byte for
+  byte the same: after an update only what changed is compiled to native
+  code again, and `M-x mega-compile-now` on an unchanged source costs
+  nothing. Before that, every remake sent all of it through the JIT again,
+  and the doctor showed fewer native functions than the day before with
+  nothing to say why; it now says when Emacs is still at it.
 - **Parsers.** An Emacs built against tree-sitter 0.20 accepts ABI 13–14 only.
 - **Cells.** MEGA keeps Emacs and a terminal agreed on the width of what a
   terminal joins. It cannot know what a terminal takes a single character

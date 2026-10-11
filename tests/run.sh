@@ -398,7 +398,9 @@ terminal_run() {
     T_EMACS=$1 T_TERM=$2 MEGA_TEST_COLOURS=$3 T_EXPECT=$4 T_LAUNCHER=${5-}
     # MEGA_TEST_FORM, when set by the caller: "make" for a session that is to
     # make the compiled copy of MEGA's Lisp, "compiled" for one that is to
-    # run from it, "native-wait" and "native" for what Emacs makes of that.
+    # run from it, "native-wait" and "native" for what Emacs makes of that,
+    # "remake" for one that makes the copy again and "native-again" for the
+    # start after it.
     # Otherwise the session runs the source and makes nothing.
     MEGA_TEST_FORM=${MEGA_TEST_FORM-}
     export MEGA_TEST_FORM
@@ -432,6 +434,8 @@ terminal_run() {
         compiled)    label="$label, from the compiled copy" ;;
         native-wait) label="$label, while Emacs compiles that to native code" ;;
         native)      label="$label, as native code" ;;
+        remake)      label="$label, making its compiled copy again" ;;
+        native-again) label="$label, as native code after that" ;;
     esac
     # Through chemacs2 or as ~/.emacs.d itself, Emacs is told nothing: it
     # finds its configuration where it always looks.
@@ -544,6 +548,14 @@ stage_terminal() {
             MEGA_TEST_FORM=native-wait
             T_LIMIT=400 terminal_run "$EMACS" xterm-256color 16777216 supported
             MEGA_TEST_FORM=native
+            terminal_run "$EMACS" xterm-256color 16777216 supported
+            # And a copy that is made again, of the same source, costs none
+            # of that: Emacs takes native code only if it is no older than
+            # the compiled file it stands for, and the start after is
+            # native from its first moment all the same.
+            MEGA_TEST_FORM=remake
+            terminal_run "$EMACS" xterm-256color 16777216 supported
+            MEGA_TEST_FORM=native-again
             terminal_run "$EMACS" xterm-256color 16777216 supported
         else
             skip "terminal  as native code (this Emacs cannot compile to it)"

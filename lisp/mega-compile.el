@@ -17,9 +17,15 @@
 ;;                                     as it gets there
 ;;   after that                        native code from the first moment
 ;;
-;; `M-x mega-doctor' says which of these a session is.  Nothing compiled is
+;; `M-x mega-doctor' says which of these a session is, how many functions
+;; run in which form, and whether Emacs is still at it.  Nothing compiled is
 ;; ever written into the configuration directory or the repository it came
 ;; from.
+;;
+;; After an update only what changed goes through this again.  Emacs takes
+;; a file of native code only if it is no older than the compiled file it
+;; stands for; so a copy that is made again gives a compiled file that came
+;; out byte for byte the same the time it had, see `mega-compile--keep-time'.
 ;;
 ;; Safety.  Which copy is loaded is decided in early-init.el, by a
 ;; fingerprint of the source: a compiled copy made from anything but the
@@ -86,6 +92,40 @@ is there already is still used: `M-x mega-compile-forget' deletes it."
                3600)
         (ignore-errors (delete-directory file t))))))
 
+(defun mega-compile--same-file-p (one other)
+  "Non-nil if the files ONE and OTHER hold the same bytes."
+  (and (file-readable-p one) (file-readable-p other)
+       (eql (file-attribute-size (file-attributes one))
+            (file-attribute-size (file-attributes other)))
+       (with-temp-buffer
+         (set-buffer-multibyte nil)
+         (insert-file-contents-literally one)
+         (let ((bytes (buffer-string)))
+           (erase-buffer)
+           (insert-file-contents-literally other)
+           (equal bytes (buffer-string))))))
+
+(defun mega-compile--keep-time (copy target)
+  "Give COPY's compiled file the time it had in TARGET, if it came out the same.
+COPY is a source file just compiled, in a directory that is about to
+take the place of the directory TARGET.
+
+Emacs takes a file of native code only if it is no older than the
+compiled file it stands for.  A copy that is made again has compiled
+files of this minute, and without this every one of them, changed or
+not, would run as bytecode until Emacs had made its native code a
+second time.  The same bytes are the same program: what a file takes
+from another when it is compiled, a macro, is in those bytes, so a file
+that has not changed itself but uses one that has does not keep its
+time.  The source beside it gets the same time: Emacs says so at every
+start when a source file is newer than its compiled file."
+  (let* ((new (concat copy "c"))
+         (old (expand-file-name (file-name-nondirectory new) target)))
+    (when (mega-compile--same-file-p new old)
+      (let ((time (file-attribute-modification-time (file-attributes old))))
+        (set-file-times new time)
+        (set-file-times copy time)))))
+
 (defun mega-compile-build (&optional target source)
   "Compile the Lisp in SOURCE into the directory TARGET, all of it or none.
 SOURCE defaults to `mega-lisp-dir' and TARGET to `mega-compiled-dir'.
@@ -115,8 +155,9 @@ it is left as it was and an error is signalled.  Returns TARGET."
             (dolist (copy copies)
               (unless (eq (byte-compile-file copy) t)
                 (error "%s did not compile" (file-name-nondirectory copy)))))
-          ;; A copy that somebody finds and edits would be an edit lost.
           (dolist (copy copies)
+            (mega-compile--keep-time copy target)
+            ;; A copy that somebody finds and edits would be an edit lost.
             (set-file-modes copy #o444))
           ;; Of the copies, not of the source: it says what was compiled,
           ;; whatever happened to the source meanwhile.  Written last.
@@ -282,6 +323,17 @@ next."
 
 ;;;; The doctor
 
+(defun mega-compile--native-pending ()
+  "How many files Emacs has still to compile to native code, in the background.
+What it is at and what waits; 0 where Emacs does none of that."
+  (+ (if (bound-and-true-p comp-files-queue)
+         (length (symbol-value 'comp-files-queue))
+       0)
+     (if (and (boundp 'comp-async-compilations)
+              (hash-table-p (symbol-value 'comp-async-compilations)))
+         (hash-table-count (symbol-value 'comp-async-compilations))
+       0)))
+
 (defun mega-compile-forms ()
   "How MEGA's functions are held in this session: (NATIVE BYTE SOURCE), counts."
   (let ((native 0) (byte 0) (source 0))
@@ -307,7 +359,12 @@ next."
                            ((zerop native) "the compiled copy")
                            (t "the compiled copy, as native code where Emacs has got to")))
     (mega-doctor-row "its functions"
-                     (format "%d native, %d compiled, %d source" native byte source))
+                     (format "%d native, %d compiled, %d source%s" native byte source
+                             (let ((left (mega-compile--native-pending)))
+                               (if (> left 0)
+                                   (format "; Emacs is making native code of %d more file%s"
+                                           left (if (= left 1) "" "s"))
+                                 ""))))
     (mega-doctor-row
      "the compiled copy"
      (cond (mega-compiled-p (abbreviate-file-name mega-compiled-dir))
