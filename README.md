@@ -128,6 +128,10 @@ a dev container MEGA shows the stack and the variables itself, in a window
 below, and `C-c g b` sets breakpoints before you start; that needs lldb's
 adapter (`lldb-dap`) or gdb 14 or newer in the container.
 
+**Every prompt** lists its choices and narrows the list as you type. `C-n`
+and `C-p` move in it, `C-v` and `M-v` by a page, `M-<` and `M->` to its first
+and last entry; `RET` takes the highlighted one, `M-j` exactly what you typed.
+
 **Searching** (`M-g a`) is done by `git grep`, as a Perl regular expression,
 and the prompt says so. Outside a checkout `git grep` cannot search, and the
 next of git grep, ripgrep and grep that is installed does.

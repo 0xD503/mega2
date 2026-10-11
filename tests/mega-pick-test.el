@@ -172,5 +172,51 @@ that must not mean searching for the hit itself."
       (mega-pick-read "Say: " #'ignore :keymap map))
     (should ran)))
 
+;;;; A page at a time
+
+(ert-deftest mega-minibuffer-a-page-is-what-the-prompt-shows-less-one ()
+  "Asked for after use: C-v and M-v in the list of a search's hits."
+  (require 'icomplete)
+  (dolist (key '("C-v" "<next>"))
+    (should (eq (lookup-key icomplete-vertical-mode-minibuffer-map (kbd key))
+                'mega-minibuffer-page-down)))
+  (dolist (key '("M-v" "<prior>"))
+    (should (eq (lookup-key icomplete-vertical-mode-minibuffer-map (kbd key))
+                'mega-minibuffer-page-up)))
+  ;; A prompt of twelve lines at most: its own, and eleven entries.
+  (let ((moves nil) (entries 100)
+        (icomplete-prospects-height 12)
+        (max-mini-window-height 0.9))
+    (cl-letf (((symbol-function 'icomplete-forward-completions)
+               (lambda () (when (> entries 1) (setq entries (1- entries)) (push 'down moves))))
+              ((symbol-function 'icomplete-backward-completions)
+               (lambda () (when (< entries 100) (setq entries (1+ entries)) (push 'up moves)))))
+      (should (= (mega-minibuffer-page) 10))
+      (mega-minibuffer-page-down)
+      (should (equal moves (make-list 10 'down)))
+      (setq moves nil)
+      (mega-minibuffer-page-up)
+      (should (equal moves (make-list 10 'up)))
+      ;; At the start there is nowhere to go, and that is not an error.
+      (setq moves nil)
+      (mega-minibuffer-page-up)
+      (should-not moves)
+      ;; Nor at the end: three entries from it, a page is three.
+      (setq entries 4 moves nil)
+      (mega-minibuffer-page-down)
+      (should (equal moves (make-list 3 'down)))
+      (mega-minibuffer-page-down)
+      (should (= (length moves) 3))))
+  ;; A frame too small for that many lines gives the prompt fewer.
+  (let ((icomplete-prospects-height 12))
+    (let ((max-mini-window-height 6))
+      (should (= (mega-minibuffer-page) 4)))
+    (cl-letf (((symbol-function 'frame-height) (lambda (&rest _) 20)))
+      (let ((max-mini-window-height 0.4))
+        (should (= (mega-minibuffer-page) 6))))
+    ;; However small, a page is at least one entry.
+    (let ((max-mini-window-height 1))
+      (should (= (mega-minibuffer-page) 1)))))
+
 (provide 'mega-pick-test)
 ;;; mega-pick-test.el ends here

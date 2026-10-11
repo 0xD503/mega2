@@ -53,6 +53,7 @@ minibuffer list on: the keys are simply waiting in the input queue."
   (declare-function mega-pick-read "mega-pick")
   (declare-function mega-search-project "mega-search")
   (declare-function mega-project-tree "mega-project")
+  (declare-function mega-minibuffer-page "mega-minibuffer")
   (require 'mega-pick)
   ;; The live list: RET takes the highlighted entry, not the typed text.
   (let ((choice (mega-terminal-probe--typing "an RET"
@@ -68,6 +69,39 @@ minibuffer list on: the keys are simply waiting in the input queue."
                   (completing-read "File: " '("README.md" "src/lib.rs" "src/main.rs")))))
     (unless (equal choice "src/main.rs")
       (mega-terminal-probe--problem "fuzzy matching chose %S" choice)))
+  ;; A page at a time, in a list longer than the prompt shows.  The keys
+  ;; are waiting before the list is drawn, which is the hard case; and the
+  ;; prompt keeps no history, which would put what was chosen first.
+  (let* ((choices (mapcar (lambda (n) (format "pick-%02d" n)) (number-sequence 1 60)))
+         (pick (lambda (keys)
+                 (mega-terminal-probe--typing keys
+                   (completing-read "Pick: " choices nil t nil t))))
+         ;; How long a page is, is a matter of the prompt: asked in one.
+         (page (let (found)
+                 (minibuffer-with-setup-hook
+                     (:append (lambda () (setq found (mega-minibuffer-page))))
+                   (funcall pick "RET"))
+                 found))
+         (entry (lambda (n) (format "pick-%02d" n))))
+    ;; More than an entry, and less than the lines the prompt may take.
+    (unless (and (integerp page) (> page 1)
+                 (< page (floor (* max-mini-window-height (frame-height)))))
+      (mega-terminal-probe--problem "a page of a prompt's list is %S entries" page))
+    (dolist (case `(("C-v RET" . ,(funcall entry (1+ page)))
+                    ("C-v C-v RET" . ,(funcall entry (1+ (* 2 page))))
+                    ("C-v C-v M-v RET" . ,(funcall entry (1+ page)))
+                    ("C-v M-v RET" . "pick-01")
+                    ;; Neither end is an error, or a way out of the list.
+                    ("M-v RET" . "pick-01")
+                    ("M-> C-v RET" . "pick-60")
+                    ("M-> M-v RET" . ,(funcall entry (- 60 page)))
+                    ;; The page keys of the keyboard do the same.
+                    ("<next> RET" . ,(funcall entry (1+ page)))
+                    ("<next> <prior> RET" . "pick-01")))
+      (let ((got (funcall pick (car case))))
+        (unless (equal got (cdr case))
+          (mega-terminal-probe--problem "in a prompt, %s took %s and not %s"
+                                        (car case) got (cdr case))))))
   ;; A real search with a real program, from typing to landing on the line.
   (let* ((project (file-name-as-directory
                    (make-temp-file (expand-file-name "probe-" (getenv "MEGA_TEST_SANDBOX"))
