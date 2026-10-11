@@ -242,7 +242,7 @@ downloading parsers, and deleting what MEGA has stored.
 | Want to… | Edit |
 | --- | --- |
 | Change something on this machine only | `local.el` |
-| Change the theme | `(setq mega-theme 'mega-hacker)` in `local.el`; `M-x mega-theme` for this session only |
+| Change the theme | `(setq mega-theme 'mega-nord)` in `local.el`; `M-x mega-theme` for this session only |
 | Add, move or remove a key | `mega-keys-add` / `mega-keys-remove`, in `local.el`; the cheat sheet follows |
 | Change a global default | `lisp/mega-core.el` |
 | Add a language: modes, server, formatter, indentation | one row of `mega-languages` in `lisp/mega-lang.el` |
@@ -253,10 +253,10 @@ downloading parsers, and deleting what MEGA has stored.
 `local.el` is yours: git ignores it, so an update never touches it. Start
 from the examples with `cp local.example.el local.el`.
 
-There are two themes. `mega-nord`, the Nord palette, is the one MEGA starts
-with. `mega-hacker` is green on black, after the old screens: a background
-that is all but black, text in the green of phosphor, and what stands out
-from it bright. A theme is a palette of seventeen colours in
+There are two themes. `mega-hacker`, the one MEGA starts with, is green on
+black, after the old screens: a background that is all but black, text in
+the green of phosphor, and what stands out from it bright. `mega-nord` is
+the Nord palette, soft and blue-grey. A theme is a palette of seventeen colours in
 `lisp/NAME-theme.el`; which face gets which of them is written once, in
 `lisp/mega-themes.el`, so a colour is changed in one place and a theme of
 your own is one short file and its name in `mega-themes`. A project's

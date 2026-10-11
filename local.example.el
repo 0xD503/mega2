@@ -20,8 +20,8 @@
 ;;   (with-eval-after-load 'mega-ui
 ;;     (remove-hook 'text-mode-hook #'mega-ui-ruler))
 ;;
-;;   ;; Green on black instead of Nord.  `M-x mega-theme' tries one out.
-;;   (setq mega-theme 'mega-hacker)
+;;   ;; Nord instead of green on black.  `M-x mega-theme' tries one out.
+;;   (setq mega-theme 'mega-nord)
 ;;
 ;;   ;; One more kind of file MEGA must not remember.
 ;;   (add-to-list 'mega-private-file-regexps "/vault/")

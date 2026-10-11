@@ -50,9 +50,11 @@ go by: 4.5 is enough for text, 3 for large or bold text."
       (/ (+ high 0.05) (+ low 0.05)))))
 
 (ert-deftest mega-ui-the-theme-is-on-and-is-the-only-one ()
-  (should (eq mega-theme 'mega-nord))
-  (should (equal custom-enabled-themes '(mega-nord)))
-  (should (equal mega-themes '(mega-nord mega-hacker)))
+  (should (eq mega-theme 'mega-hacker))
+  (should (equal custom-enabled-themes '(mega-hacker)))
+  ;; The one MEGA starts with unasked is the first.
+  (should (equal mega-themes '(mega-hacker mega-nord)))
+  (should (eq (default-toplevel-value 'mega-theme) (car mega-themes)))
   ;; Each has its file, and the file that they share is not taken for one.
   (dolist (theme mega-themes)
     (should (file-exists-p (expand-file-name (format "lisp/%s-theme.el" theme)
@@ -149,29 +151,30 @@ go by: 4.5 is enough for text, 3 for large or bold text."
 (ert-deftest mega-ui-the-theme-is-one-you-choose ()
   (unwind-protect
       (let ((inhibit-message t))
-        (mega-theme 'mega-hacker)
-        (should (equal custom-enabled-themes '(mega-hacker)))
-        ;; Not a theme: said, and what is on stays on.
-        (should-error (mega-theme 'no-such-theme) :type 'user-error)
-        (should (equal custom-enabled-themes '(mega-hacker)))
         (mega-theme 'mega-nord)
         (should (equal custom-enabled-themes '(mega-nord)))
+        ;; Not a theme: said, and what is on stays on.
+        (should-error (mega-theme 'no-such-theme) :type 'user-error)
+        (should (equal custom-enabled-themes '(mega-nord)))
+        (mega-theme 'mega-hacker)
+        (should (equal custom-enabled-themes '(mega-hacker)))
         ;; At the start it is what local.el says.
-        (let ((mega-theme 'mega-hacker))
+        (let ((mega-theme 'mega-nord))
           (mega-ui-start-theme)
-          (should (equal custom-enabled-themes '(mega-hacker))))
-        ;; A slip of the pen there costs a warning, and not the colours.
-        (let ((mega-theme 'mega-hackr)
+          (should (equal custom-enabled-themes '(mega-nord))))
+        ;; A slip of the pen there costs a warning, and not the colours:
+        ;; then it is the theme MEGA starts with unasked.
+        (let ((mega-theme 'mega-nrod)
               (warned nil))
           (cl-letf (((symbol-function 'display-warning)
                      (lambda (_type message &rest _) (push message warned))))
             (mega-ui-start-theme))
-          (should (equal custom-enabled-themes '(mega-nord)))
+          (should (equal custom-enabled-themes '(mega-hacker)))
           (should (equal (length warned) 1))
-          (should (string-search "mega-hackr" (car warned)))
-          (should (string-search "mega-hacker" (car warned)))))
-    (mega-theme 'mega-nord))
-  (should (equal custom-enabled-themes '(mega-nord))))
+          (should (string-search "mega-nrod" (car warned)))
+          (should (string-search "mega-nord" (car warned)))))
+    (mega-theme 'mega-hacker))
+  (should (equal custom-enabled-themes '(mega-hacker))))
 
 (ert-deftest mega-ui-the-theme-keeps-out-of-poor-terminals ()
   "Every face is conditional on 256 colours, so 16-colour terminals keep theirs."

@@ -726,16 +726,16 @@ copy as native code.  Anything else: from source."
   (if (>= (display-color-cells) 256)
       ;; The theme reached the screen, not merely the theme list.
       (progn
-        (unless (equal (face-attribute 'default :background) "#2E3440")
+        (unless (equal (face-attribute 'default :background) "#0A0F0C")
           (mega-terminal-probe--problem "default background is %s"
                                         (face-attribute 'default :background)))
-        (unless (equal (face-attribute 'font-lock-string-face :foreground) "#A3BE8C")
+        (unless (equal (face-attribute 'font-lock-string-face :foreground) "#4DFF88")
           (mega-terminal-probe--problem "strings are %s"
                                         (face-attribute 'font-lock-string-face
                                                         :foreground))))
     ;; Too few colours to approximate the palette: the theme must stay out of
     ;; the way and leave the terminal's own colours alone.
-    (when (equal (face-attribute 'default :background) "#2E3440")
+    (when (equal (face-attribute 'default :background) "#0A0F0C")
       (mega-terminal-probe--problem "the theme was applied with only %s colours"
                                     (display-color-cells))))
   ;; The other theme, switched to as `M-x mega-theme' does it, and back:
@@ -743,30 +743,30 @@ copy as native code.  Anything else: from source."
   ;; nothing of the first is left under them.
   (condition-case err
       (progn
-        (mega-theme 'mega-hacker)
+        (mega-theme 'mega-nord)
         (redisplay t)
-        (unless (equal custom-enabled-themes '(mega-hacker))
+        (unless (equal custom-enabled-themes '(mega-nord))
           (mega-terminal-probe--problem "after switching, the themes are %S"
                                         custom-enabled-themes))
         (if (>= (display-color-cells) 256)
-            (unless (and (equal (face-attribute 'default :background) "#0A0F0C")
-                         (equal (face-attribute 'default :foreground) "#A6E3B4")
+            (unless (and (equal (face-attribute 'default :background) "#2E3440")
+                         (equal (face-attribute 'default :foreground) "#D8DEE9")
                          (equal (face-attribute 'font-lock-string-face :foreground)
-                                "#4DFF88"))
+                                "#A3BE8C"))
               (mega-terminal-probe--problem
                "the other theme gives %s on %s, strings %s"
                (face-attribute 'default :foreground)
                (face-attribute 'default :background)
                (face-attribute 'font-lock-string-face :foreground)))
-          (when (equal (face-attribute 'default :background) "#0A0F0C")
+          (when (equal (face-attribute 'default :background) "#2E3440")
             (mega-terminal-probe--problem
              "the other theme was applied with only %s colours"
              (display-color-cells))))
-        (mega-theme 'mega-nord)
+        (mega-theme 'mega-hacker)
         (redisplay t)
-        (unless (and (equal custom-enabled-themes '(mega-nord))
+        (unless (and (equal custom-enabled-themes '(mega-hacker))
                      (or (< (display-color-cells) 256)
-                         (equal (face-attribute 'default :background) "#2E3440")))
+                         (equal (face-attribute 'default :background) "#0A0F0C")))
           (mega-terminal-probe--problem "switching back left %S on %s"
                                         custom-enabled-themes
                                         (face-attribute 'default :background))))

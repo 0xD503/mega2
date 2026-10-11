@@ -22,14 +22,14 @@
 ;; The themes are files of MEGA's own, next to this one, and one of them is
 ;; on.  What they have in common is in mega-themes.el.
 
-(defconst mega-themes '(mega-nord mega-hacker)
-  "The themes MEGA comes with.
-`mega-nord' is the Nord palette; `mega-hacker' is green on black.")
+(defconst mega-themes '(mega-hacker mega-nord)
+  "The themes MEGA comes with, the one it starts with first.
+`mega-hacker' is green on black; `mega-nord' is the Nord palette.")
 
-(defcustom mega-theme 'mega-nord
+(defcustom mega-theme (car mega-themes)
   "The theme MEGA starts with: one of `mega-themes'.
 Set it in local.el.  `M-x mega-theme' changes the theme of a session."
-  :type '(choice (const mega-nord) (const mega-hacker))
+  :type '(choice (const mega-hacker) (const mega-nord))
   :group 'mega)
 
 (add-to-list 'custom-theme-load-path mega-lisp-dir)
@@ -57,10 +57,10 @@ start with a theme, set the variable `mega-theme' in local.el."
 (defun mega-ui-start-theme ()
   "Switch on the theme `mega-theme' names.
 A name in local.el that is not a theme must not cost the colours: then
-the one MEGA has always had is on, and what was asked for is said."
+the one MEGA starts with unasked is on, and what was asked for is said."
   (if (memq mega-theme mega-themes)
       (mega-theme mega-theme)
-    (mega-theme 'mega-nord)
+    (mega-theme (car mega-themes))
     (display-warning
      'mega (format "No theme of MEGA's is called %s: there are %s"
                    mega-theme (mapconcat #'symbol-name mega-themes ", ")))))

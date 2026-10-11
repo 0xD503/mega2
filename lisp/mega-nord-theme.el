@@ -2,11 +2,16 @@
 
 ;;; Commentary:
 
-;; MEGA's first theme, and the one it starts with.  The palette is
-;; https://www.nordtheme.com/; `comment' is Nord's own "brightened nord3",
-;; because plain nord3 is too dim to read on nord0.
+;; MEGA's first theme.  The palette is https://www.nordtheme.com/;
+;; `comment' is Nord's own "brightened nord3", because plain nord3 is too
+;; dim to read on nord0.
 ;;
-;; Which face gets which of these colours is in mega-themes.el.
+;; Which face gets which of these colours is in mega-themes.el.  To use it,
+;; in local.el:
+;;
+;;   (setq mega-theme 'mega-nord)
+;;
+;; or `M-x mega-theme' to try it for a session.
 
 ;;; Code:
 
