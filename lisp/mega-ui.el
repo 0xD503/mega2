@@ -111,6 +111,125 @@
       show-paren-when-point-inside-paren t
       show-paren-context-when-offscreen 'overlay)
 
+;;;; What a terminal is sent
+;;
+;; A terminal is a grid of cells, and Emacs and the terminal each keep count
+;; of which cell every character is in.  They have to agree: Emacs redraws a
+;; part of a line by going to a cell and writing, and if the text is not
+;; where Emacs thinks it is, it writes over what it meant to leave and wipes
+;; what it meant to keep.  The buffer is as it was; the screen shows text
+;; missing, moved to another line, or under a note meant for after it.  And
+;; one such line is enough to spoil the lines around it.
+;;
+;; The count goes wrong where characters are joined into one picture, and
+;; in two ways.
+;;
+;; A terminal joins by rules of its own.  U+FE0F after a symbol asks for it
+;; as an emoji, and tmux then gives it two cells; a skin tone goes into the
+;; emoji before it; U+200D makes one picture of what stands on either side.
+;; Emacs counts none of that the same way, and no two terminals do.
+;;
+;; And Emacs, on a terminal, takes whatever it joins for one cell.  That is
+;; right for a letter and its accent.  It is wrong for anything that holds
+;; a character two cells wide: an emoji, a syllable of Hangul put together
+;; from its parts, a Chinese character with a variation selector.
+;;
+;; So on a text terminal the characters that make a terminal join are not
+;; sent, and Emacs joins nothing that holds one of them or a character of
+;; two cells.  What is left is the joining that takes one cell on both
+;; sides, an accent with its letter and a vowel sign with its consonant,
+;; and without that a terminal would not be sent those marks at all.
+;; Everything else goes out character by character, each as wide as both
+;; sides know it to be.
+;;
+;; The price is in looks only.  A skull appears in its plain form, a family
+;; as its members side by side, a thumb without its skin tone; and a mark
+;; that belongs to a character of two cells stands in a cell of its own
+;; after it.  A graphical display has no cells to miscount, and there
+;; everything is as Emacs has it.
+;;
+;; The terminal stage of the tests asks a real tmux about each line of
+;; tests/mega-screen-lines.txt: what is under the cursor that Emacs believes
+;; to be on a known character, and whether the screen shows every character
+;; of the line that was to be shown.
+
+(defconst mega-ui-terminal-joiners
+  '((#xFE00 . #xFE0F)                   ; variation selectors, U+FE0F among them
+    (#xE0100 . #xE01EF)                 ; the ones for Chinese characters
+    (#x200D . #x200D)                   ; zero width joiner
+    (#x20E3 . #x20E3)                   ; combining enclosing keycap
+    (#x1F3FB . #x1F3FF)                 ; emoji skin tones
+    (#xE0020 . #xE007F))                ; tags, which spell the flag of Scotland
+  "The characters that make a terminal draw their neighbours as one picture.
+Ranges, as (FROM . TO).  On a text terminal they are not sent.")
+
+(defconst mega-ui-terminal-marks
+  '((#x302A . #x302D)                   ; tone marks of Chinese
+    (#x3099 . #x309A))                  ; voicing marks of kana
+  "Marks that Emacs counts as two cells wide, and every terminal as none.
+Ranges, as (FROM . TO).  A terminal puts each onto the character before
+it, as it does an accent; Emacs has them as wide as the script they
+belong to.")
+
+(defconst mega-ui-terminal-parts
+  '((#x1160 . #x11FF) (#xD7B0 . #xD7C6) (#xD7CB . #xD7FB))
+  "The vowels and final consonants that syllables of Hangul are put together from.
+Ranges, as (FROM . TO).  They have no width, and Emacs shows them only
+as a part of a syllable, which is two cells wide.")
+
+(defvar mega-ui--unsent
+  (let ((table (make-char-table nil)))
+    (dolist (range mega-ui-terminal-joiners)
+      (set-char-table-range table range t))
+    table)
+  "A char-table: non-nil for each of `mega-ui-terminal-joiners'.")
+
+(defun mega-ui--one-cell-p (from to string)
+  "Whether the characters FROM to TO can be joined and take one cell.
+Positions in STRING, or in the buffer when that is nil.  They cannot
+when one of them is two cells wide, or is not sent to a terminal."
+  (let ((fine t) char)
+    (while (and fine (< from to))
+      (setq char (if string (aref string from) (char-after from))
+            fine (and char
+                      (< (char-width char) 2)
+                      (not (aref mega-ui--unsent char)))
+            from (1+ from)))
+    fine))
+
+(defun mega-ui-compose (func from to font-object string direction)
+  "Join the characters FROM to TO, unless a terminal would miscount them.
+A value for `auto-composition-function': the arguments FUNC, FROM, TO,
+FONT-OBJECT, STRING and DIRECTION are those of `auto-compose-chars',
+which does the joining.  FONT-OBJECT is a font on a graphical display,
+and there nothing is held back.  See the comment above this function."
+  (when (or (fontp font-object)
+            (mega-ui--one-cell-p from to string))
+    (auto-compose-chars func from to font-object string direction)))
+
+(defun mega-ui-agree-with-the-terminal ()
+  "Keep Emacs from sending a text terminal what makes cells miscount.
+See the comment above this function.  What is set here says what it is
+for a terminal and leaves a graphical display as it was, so it holds
+where both are in use."
+  (setq-default auto-composition-function #'mega-ui-compose)
+  ;; Drawn as nothing on a terminal, and elsewhere as before.
+  (dolist (range mega-ui-terminal-joiners)
+    (let ((stock (char-table-range glyphless-char-display (car range))))
+      (set-char-table-range glyphless-char-display range
+                            (cons (if (consp stock) (car stock) stock)
+                                  'zero-width))))
+  (dolist (range mega-ui-terminal-marks)
+    (set-char-table-range char-width-table range 0))
+  ;; A part of a syllable that is not joined to one would not be drawn at
+  ;; all.  With a rule for itself it is, on a terminal, where the function
+  ;; of a rule is never called; on a graphical display this one says no.
+  (dolist (range mega-ui-terminal-parts)
+    (set-char-table-range composition-function-table range
+                          (list (vector nil 0 #'ignore)))))
+
+(mega-ui-agree-with-the-terminal)
+
 ;;;; The mouse, in a terminal
 ;;
 ;; Click to put the cursor somewhere, click in the file tree, scroll with

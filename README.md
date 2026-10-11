@@ -284,6 +284,18 @@ programs it found, and whether the promises above are really in force.
 `M-x mega-keys-mode` turns every MEGA key off, leaving stock Emacs. On an
 Emacs older than 31.1 MEGA configures nothing and says so.
 
+In a terminal, an emoji that is made of several characters is drawn
+plainly: a skull without its colour, a family as three faces side by side, a
+thumb without its skin tone. That is on purpose. Emacs and a terminal each
+keep count of the cells a line takes, such sequences are where they disagree,
+and a line they disagree on is drawn over its neighbours: text looks cut
+off, moved or gone while the buffer holds every character of it. So MEGA
+does not send a terminal what makes it join characters. Should a screen
+ever look wrong all the same, nothing is lost: what the buffer holds is what
+`C-x u`, the undo tree, shows and what a save writes. `C-l` draws the screen
+again; a character newer than your terminal knows keeps its line wrong
+until it is scrolled away.
+
 `MEGA_SOURCE=1 emacs` runs MEGA from source this once, whatever compiled
 copy there is. `M-x mega-compile-forget` deletes the copy; `(setq
 mega-compile nil)` in `local.el` stops MEGA from making one.
@@ -298,7 +310,10 @@ MEGA_REAL_IMAGE=my/image tests/run.sh container   # a real container: see below
 ```
 
 The tests run on both forms of MEGA's Lisp, source and compiled, and a real
-terminal session is taken through all of it: source, compiled, native.
+terminal session is taken through all of it: source, compiled, native. With
+tmux installed, a tmux of the tests' own is also asked what its grid holds
+after Emacs has drawn some seventy awkward lines: emoji, accents, scripts
+that join. Yours is not touched.
 
 The `bench` stage times what you wait for (a keystroke, the modeline, the
 completion menu, listing and finding a file, a search, a save, the undo tree,

@@ -211,5 +211,110 @@
   (should-not mouse-wheel-progressive-speed)
   (should (equal (car mouse-wheel-scroll-amount) 3)))
 
+;;;; What a terminal is sent
+;;
+;; Whether Emacs and a terminal then agree is asked of a real terminal, in
+;; the terminal stage of run.sh.  Here: that the rule is what it says.
+
+(ert-deftest mega-ui-what-is-joined-on-a-terminal-takes-one-cell ()
+  ;; A letter and its accent, two accents, Thai, Devanagari, Hebrew: one
+  ;; cell on both sides.
+  (dolist (text '("e\u0301" "e\u0323\u0302" "\u0E27\u0E31" "\u0938\u094D"
+                  "\u05E9\u05B8"))
+    (should (mega-ui--one-cell-p 0 (length text) text)))
+  ;; Anything with a character of two cells in it: an emoji, kana, a
+  ;; syllable of Hangul from its parts, a Chinese character, wherever in
+  ;; the sequence it is.
+  (dolist (text '("\U0001F480\u0301" "\u304B\u3099" "\u1112\u1161\u11AB"
+                  "\u845B\u0301" "a\u0301\U0001F480" "\U0001F1EA\U0001F480"))
+    (should-not (mega-ui--one-cell-p 0 (length text) text)))
+  ;; And anything with a character in it that makes a terminal join: the
+  ;; emoji selector, the joiner, the keycap mark, a skin tone, a tag.
+  (dolist (text '("\u2620\uFE0F" "\u2764\uFE0F\u200D\u2764" "1\uFE0F\u20E3"
+                  "1\u20E3" "a\u200Db" "\u261D\U0001F3FD" "a\U000E0067"
+                  "\u2268\uFE00" "e\u0301\uFE0F"))
+    (should-not (mega-ui--one-cell-p 0 (length text) text)))
+  ;; Only the characters asked about count.
+  (should (mega-ui--one-cell-p 1 3 "\U0001F480e\u0301\uFE0F"))
+  ;; In a buffer as in a string; and past its end there is nothing to join.
+  (with-temp-buffer
+    (insert "e\u0301 \u2620\uFE0F")
+    (should (mega-ui--one-cell-p 1 3 nil))
+    (should-not (mega-ui--one-cell-p 4 6 nil))
+    (should-not (mega-ui--one-cell-p 5 9 nil))))
+
+(ert-deftest mega-ui-a-terminal-is-not-given-what-it-would-miscount ()
+  (let ((frame (selected-frame))
+        calls)
+    (cl-letf (((symbol-function 'auto-compose-chars)
+               (lambda (&rest arguments) (push arguments calls) 'joined)))
+      ;; On a terminal Emacs hands over the frame, not a font.
+      (should (eq (mega-ui-compose 'shape 0 2 frame "e\u0301" 'L2R) 'joined))
+      (should (equal calls `((shape 0 2 ,frame "e\u0301" L2R))))
+      (should-not (mega-ui-compose 'shape 0 2 frame "\u2620\uFE0F" nil))
+      (should-not (mega-ui-compose 'shape 0 2 frame "\u304B\u3099" nil))
+      (should (= (length calls) 1))
+      ;; With a font it is a graphical display, and nothing is held back.
+      (let ((font (font-spec :family "Any")))
+        (should (eq (mega-ui-compose 'shape 0 2 font "\u2620\uFE0F" nil)
+                    'joined))
+        (should (equal (car calls) `(shape 0 2 ,font "\u2620\uFE0F" nil)))))))
+
+(ert-deftest mega-ui-emacs-is-set-up-to-agree-with-a-terminal ()
+  (should (eq (default-value 'auto-composition-function) 'mega-ui-compose))
+  (with-temp-buffer
+    (should (eq auto-composition-function 'mega-ui-compose)))
+  (dotimes (_ 2)
+    ;; On a terminal the joiners are drawn as nothing; on a graphical
+    ;; display as Emacs draws them, which is not as nothing.  Twice: what
+    ;; was set is not built upon.
+    (dolist (range mega-ui-terminal-joiners)
+      (dolist (char (list (car range) (cdr range)))
+        (let ((how (char-table-range glyphless-char-display char)))
+          (should (consp how))
+          (should (memq (car how) '(nil thin-space)))
+          (should (eq (cdr how) 'zero-width)))
+        (should (aref mega-ui--unsent char))))
+    ;; Marks have no width, as on every terminal.
+    (dolist (range mega-ui-terminal-marks)
+      (should (= (char-width (car range)) 0))
+      (should (= (char-width (cdr range)) 0))
+      (should (eq (get-char-code-property (car range) 'general-category) 'Mn)))
+    ;; The parts of a syllable are drawn by themselves where they are not
+    ;; joined, and on a graphical display the rule for that declines.
+    (dolist (range mega-ui-terminal-parts)
+      (dolist (char (list (car range) (cdr range)))
+        (should (= (char-width char) 0))
+        (should (equal (char-table-range composition-function-table char)
+                       (list (vector nil 0 #'ignore))))))
+    (mega-ui-agree-with-the-terminal))
+  ;; Nothing but the joiners is kept back.
+  (dolist (char '(?a #x0301 #x200C #x2620 #x1F480 #x1161 #x3099 #xE0001))
+    (should-not (aref mega-ui--unsent char))))
+
+(ert-deftest mega-ui-a-real-terminal-is-asked-about-each-of-them ()
+  "Every range the rule names is in a line that the terminal stage shows."
+  (let ((lines (with-temp-buffer
+                 (let ((coding-system-for-read 'utf-8))
+                   (insert-file-contents
+                    (expand-file-name "mega-screen-lines.txt" mega-test-dir)))
+                 (split-string (buffer-string) "\n" t))))
+    (should (> (length lines) 50))
+    ;; A name, then a sequence between x and y, then the bar the cursor is
+    ;; put on; and no name twice.
+    (dolist (line lines)
+      (should (string-match-p "\\`[^:|]+: x[^|]+y|\\'" line)))
+    (should (equal (length lines)
+                   (length (seq-uniq (mapcar (lambda (line)
+                                               (car (split-string line ":")))
+                                             lines)))))
+    (dolist (range (append mega-ui-terminal-joiners mega-ui-terminal-marks
+                           mega-ui-terminal-parts))
+      (should (seq-some (lambda (line)
+                          (seq-some (lambda (char)
+                                      (<= (car range) char (cdr range)))
+                                    line))
+                        lines)))))
+
 (provide 'mega-ui-test)
 ;;; mega-ui-test.el ends here

@@ -1,0 +1,68 @@
+plain: xay|
+skull and the emoji selector: x☠️y|
+three of them: x☠️☠️☠️y|
+heart and the selector: x❤️y|
+warning sign and the selector: x⚠️y|
+copyright sign and the selector: x©️y|
+keycap one: x1️⃣y|
+thumb with a skin tone: x👍🏽y|
+family, joined: x👨‍👩‍👧y|
+woman technologist, joined: x👩‍💻y|
+rainbow flag, joined: x🏳️‍🌈y|
+heart on fire, joined: x❤️‍🔥y|
+flag of a country: x🇪🇸y|
+letter and one accent: xéy|
+letter and two accents: xệy|
+letter, already with its accent: xéy|
+letter, accent and the emoji selector: xé️y|
+skull, plain: x☠y|
+skull emoji, wide by itself: x💀y|
+rocket: x🚀y|
+skull emoji and the text selector: x💀︎y|
+check mark: x✓y|
+arrow: x→y|
+ellipsis, dash and dot: x…—·y|
+box line: x│y|
+Hangul: x한y|
+Hangul from its parts: x한y|
+Chinese: x中文y|
+Cyrillic: xжy|
+Cyrillic and an accent: xа́y|
+Greek: xλy|
+Arabic: xسلامy|
+Hebrew: xשלוםy|
+Devanagari: xनमस्तेy|
+Thai: xสวัสดีy|
+zero width space: x​y|
+soft hyphen: x­y|
+tab: x	y|
+flag of England, by tags: x🏴󠁧󠁢󠁥󠁮󠁧󠁿y|
+shrug, joined to a sign and a selector: x🤷‍♂️y|
+digit and the selector alone: x1️y|
+ideograph and its variation selector: x葛󠄀y|
+high voltage, wide by itself: x⚡y|
+white check mark, wide by itself: x✅y|
+star, wide by itself: x⭐y|
+watch, wide by itself: x⌚y|
+an emoji of Unicode 15: x🫨y|
+ideographic space: x　y|
+full width letter: xＡy|
+half width kana and its mark: xｶﾞy|
+kana and a combining mark: xがy|
+width a matter of opinion: x§±×°y|
+Braille: x⠿y|
+private use, as status lines have: xy|
+replacement character: x�y|
+letter in a combining circle: xa⃝y|
+zero width non-joiner: xمی‌خy|
+left to right mark: x‎y|
+byte order mark inside a line: x﻿y|
+word joiner: x⁠y|
+no-break space: x y|
+Tamil: xதமிழ்y|
+Bengali: xবাংলাy|
+Tibetan: xབོདy|
+mathematical letters: x𝓐𝔄y|
+Chinese character and a tone mark: x中〪y|
+Hangul with an old vowel: xᄒힰy|
+Hangul with an old final consonant: x하ퟋy|

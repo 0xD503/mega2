@@ -48,7 +48,9 @@ Examples of that ordering already decided:
 - **External programs are optional, never prerequisites.** Each is detected,
   and its feature is inert with a clear message when it is missing.
 - **Terminal-first.** Fully functional under `emacs -nw` and tmux. Popups use
-  TTY child frames with an echo-area or side-window fallback.
+  TTY child frames with an echo-area or side-window fallback. What is on the
+  screen is what the buffer holds: Emacs is kept from sending a terminal
+  anything the two would count the cells of differently.
 - **Launcher-neutral.** Works as a chemacs2 profile and with
   `--init-directory`; no file of MEGA mentions its launcher.
 
@@ -366,7 +368,7 @@ and a sixth when it is asked for by name:
 | unit | The ERT suite, twice: on MEGA's Lisp as source and on its compiled copy, each against a session started from the real init files. A test that waits for something that never comes is stopped and Emacs says where it was waiting |
 | boot | Startup, from source and from the compiled copy, fails no module, runs no program, opens no connection, and fits the time budget, what is put off until Emacs has started included |
 | bench | What a person waits for, each against what it is expected to take: a keystroke, the modeline, the completion menu, listing and matching files, search, save, undo history and tree, debugger messages, first use of a module and of a language server |
-| terminal | Real sessions in a pseudo-terminal: 24-bit, 256 and 8 colours, under a tmux terminal type, as a bare copy in `~/.emacs.d`, through chemacs2, and an old Emacs being refused. And four starts in a row on one cache, as after an update: the first makes the compiled copy, the second runs from it, the third waits while Emacs compiles that to native code, the fourth is native from its first moment |
+| terminal | Real sessions in a pseudo-terminal: 24-bit, 256 and 8 colours, under a tmux terminal type, as a bare copy in `~/.emacs.d`, through chemacs2, and an old Emacs being refused. And four starts in a row on one cache, as after an update: the first makes the compiled copy, the second runs from it, the third waits while Emacs compiles that to native code, the fourth is native from its first moment. And, where tmux is installed, what the grid of a terminal holds, asked of a tmux started for it: after each line of `mega-screen-lines.txt` the cursor is on the character Emacs put it on, every character that was to be shown is on its line, and after a blame note has come and gone the screen holds the lines of the buffer |
 | container | Only with `MEGA_REAL_IMAGE` set and named on the command line. A real container, started by podman from a `devcontainer.json` with no network and removed afterwards: programs run and a project built in it, and a program debugged with each debugger the image has, through the adapter client and through its console |
 
 Afterwards the configuration directory must be byte-for-byte what it was.
@@ -497,6 +499,21 @@ Things learned while building it, worth keeping in mind:
   can give it. The layout that showing a hit puts back is taken before
   the prompt opens. The unit tests have no prompt and passed; the
   terminal stage, which has one, stopped answering.
+- Emacs and a terminal each count the cells of a line, and nothing makes
+  them agree. A skull with U+FE0F after it is one cell to Emacs and two to
+  tmux; and whatever Emacs joins on a terminal it takes for one cell, a
+  syllable of Hangul or an emoji with a mark included. Where they differ
+  Emacs writes over text it meant to keep, on that line and the ones
+  beside it, and the user sees typed text gone. The buffer was whole every
+  time, and no unit test can see any of it: they have no screen. The
+  terminal stage asks a real tmux what is under the cursor.
+- A check passes on less as readily as on right. The first cure switched
+  Emacs's joining of characters off; the cursor was where it should be on
+  every line, and every accent, vowel sign and Thai tone mark had left the
+  screen, because a terminal is sent those only joined to their letter.
+  The stage now also asks that each character of a line is on it. What is
+  joined is what takes one cell on both sides, and the rest goes out
+  character by character.
 - Tests are worth only what they can fail on. Each milestone's safety,
   privacy and security checks were run against deliberately broken copies
   of the code (`MEGA_TEST_CONFIG` points the suite at a copy).
@@ -548,6 +565,14 @@ running Emacs did.
   on first use in the session that first uses it. The boot test switches
   the JIT off to listen for MEGA alone.
 - **Parsers.** An Emacs built against tree-sitter 0.20 accepts ABI 13–14 only.
+- **Cells.** MEGA keeps Emacs and a terminal agreed on the width of what a
+  terminal joins. It cannot know what a terminal takes a single character
+  for: one that is newer than the terminal's tables (an emoji of Unicode 16
+  where the system knows 15) is two cells to Emacs and one to tmux, and
+  its line is drawn wrong for as long as it is on the screen. The same holds for the marks of a
+  few scripts added to Unicode lately. A mark after a character of two
+  cells (kana written with a separate voicing mark, Hangul written as its
+  parts) is drawn in a cell of its own: readable, exact, and not pretty.
 - **Claude in the built-in terminal emulator** may render imperfectly. Inside
   tmux the session opens in a pane instead, which is the default there.
   Neither has been tried against the real program by the tests, which use a

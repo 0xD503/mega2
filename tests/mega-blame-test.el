@@ -176,6 +176,36 @@ window, and there is room for a note after every line."
     (run-hooks 'post-command-hook)
     (should-not (mega-blame-test--note))))
 
+(ert-deftest mega-blame-a-note-is-beside-the-text-and-never-in-it ()
+  "Notes come and go; what was typed is there to the character, and yours to undo."
+  (mega-blame-test--with-repository
+    (buffer-enable-undo)
+    ;; Typed and not saved, with characters a terminal draws in its own way.
+    (goto-char (point-min))
+    (forward-line 1)
+    (end-of-line)
+    (insert " \u2620\uFE0F\u2620\uFE0F typed, \U0001F480 and not saved")
+    (undo-boundary)
+    (let ((text (buffer-string))
+          (tick (buffer-chars-modified-tick))
+          (undo buffer-undo-list)
+          (notes 0))
+      (dotimes (_ 3)
+        (dolist (line '(2 1 3 2))
+          (when (mega-blame-test--rest-on line)
+            (setq notes (1+ notes)))
+          (should (equal (buffer-string) text))
+          (should (= (buffer-chars-modified-tick) tick))
+          (should (eq buffer-undo-list undo))
+          (should (buffer-modified-p))))
+      ;; And they did come: twelve times a line was rested on.
+      (should (= notes 12))
+      ;; Nothing of a note is in what would be saved or copied either.
+      (should (equal (buffer-substring-no-properties (point-min) (point-max))
+                     text))
+      (should-not (text-property-not-all (point-min) (point-max)
+                                         'display nil)))))
+
 (ert-deftest mega-blame-is-about-the-text-on-screen-saved-or-not ()
   (mega-blame-test--with-repository
     (goto-char (point-min))

@@ -19,7 +19,12 @@
 #             says what to do when one is exceeded.
 #   terminal  start it for real in a pseudo-terminal: directly, as a copy
 #             in ~/.emacs.d, through chemacs2 if you have it, and with a
-#             too-old Emacs if one exists
+#             too-old Emacs if one exists.  And, with tmux, look at what a
+#             terminal's grid really holds: that the cursor is on the
+#             character Emacs put it on, after every awkward sequence in
+#             mega-screen-lines.txt, that no character of them is left
+#             out, and that the lines on screen are the lines of the
+#             buffer.  The tmux is one of its own; yours is not touched.
 #
 #   container start a real container with podman and use it: run, build and
 #             debug in it.  Needs MEGA_REAL_IMAGE; makes one container, with
@@ -83,9 +88,17 @@ fi
 SANDBOX="${TMPDIR:-/tmp}/mega2-tests.$$"
 (umask 077 && mkdir -- "$SANDBOX") || exit 1
 SANDBOX=$(cd -- "$SANDBOX" && pwd -P) || exit 1
-trap 'rm -rf -- "$SANDBOX"' EXIT
-trap 'rm -rf -- "$SANDBOX"; exit 130' INT
-trap 'rm -rf -- "$SANDBOX"; exit 143' TERM
+# The terminal stage starts a tmux of its own to look at a screen with.  Its
+# socket is in the sandbox, where no other tmux looks, and it is ended here
+# whatever happens.
+GRID="$SANDBOX/grid.socket"
+tidy() {
+    [ -S "$GRID" ] && tmux -S "$GRID" kill-server 2>/dev/null
+    rm -rf -- "$SANDBOX"
+}
+trap tidy EXIT
+trap 'tidy; exit 130' INT
+trap 'tidy; exit 143' TERM
 
 # What a program of yours needs to find its own files.  Kept for the one
 # stage that runs one, the container stage; everything else never sees it.
@@ -588,6 +601,8 @@ stage_terminal() {
     else
         skip "terminal  refusing an old Emacs (none found; set EMACS_OLD)"
     fi
+
+    terminal_grid
 }
 
 # --- container (only when asked for) ----------------------------------------
@@ -672,6 +687,169 @@ CONTAINER_RESULTS
     else
         ok "container  nothing tried to download anything"
     fi
+}
+
+# --- terminal: what the grid of a real terminal holds -------------------------
+
+# Its own server, whatever tmux this is run from; and no configuration.
+grid() { (unset TMUX; tmux -u -S "$GRID" -f /dev/null "$@"); }
+
+# Start Emacs on the file $1 in a pane of $2 rows; $3 is Lisp to evaluate.
+grid_start() {
+    grid kill-server 2>/dev/null
+    printf '#!/bin/sh\nexec "%s" -nw --init-directory "%s" --eval "%s" "%s"\n' \
+        "$EMACS" "$CONFIG" "$3" "$1" > "$SANDBOX/grid.sh"
+    grid_term=screen-256color
+    infocmp tmux-256color >/dev/null 2>&1 && grid_term=tmux-256color
+    grid start-server \; set -g default-terminal "$grid_term" \; \
+        new-session -d -x 120 -y "$2" -s grid "sh '$SANDBOX/grid.sh'"
+}
+
+# Wait up to $2 tenths of a second for the screen to show the text $1.
+grid_wait() {
+    grid_tries=0
+    while [ "$grid_tries" -lt "$2" ]; do
+        grid capture-pane -p -t grid 2>/dev/null | grep -q -F -e "$1" && return 0
+        grid_tries=$((grid_tries + 1))
+        sleep 0.1
+    done
+    return 1
+}
+
+terminal_grid() {
+    if ! command -v tmux >/dev/null 2>&1; then
+        skip "terminal  what a terminal's grid really holds (tmux is not installed)"
+        return
+    fi
+    # A socket's name has a hundred and some bytes to fit in.
+    if [ "${#GRID}" -gt 100 ]; then
+        skip "terminal  what a terminal's grid really holds (TMPDIR is too long a name for a socket)"
+        return
+    fi
+    # Emacs writes what the locale says the terminal reads.
+    case ${LC_ALL:-${LC_CTYPE:-${LANG:-}}} in
+        *[Uu][Tt][Ff]-8* | *[Uu][Tt][Ff]8*) ;;
+        *) LC_ALL=C.UTF-8; export LC_ALL ;;
+    esac
+    version=$(tmux -V)
+    mkdir -p -- "$SANDBOX/grid"
+
+    # One: after each sequence a terminal might take for wider or narrower
+    # than Emacs does, the cursor is put on the bar that ends the line.  If
+    # the two disagree anywhere before it, the bar is not what is there.
+    lines="$SANDBOX/grid/lines.txt"
+    cp -- "$TESTS/mega-screen-lines.txt" "$lines"
+    count=$(wc -l < "$lines")
+    if ! grid_start "$lines" "$((count + 8))" \
+            '(setq mega-trust-ask-on-open nil mega-blame nil)' ||
+        ! grid_wait 'lines.txt' 150; then
+        bad "terminal  on the grid of $version: Emacs did not come up in it"
+        grid capture-pane -p -t grid 2>/dev/null | cut -c1-200 | detail
+        grid kill-server 2>/dev/null
+        return
+    fi
+    # The row of the first line is the row of the first bar the cursor is
+    # seen on, less the lines gone down by then.
+    top=
+    n=0
+    wrong=
+    wrongs=0
+    while IFS= read -r line; do
+        # One line that is miscounted spoils the ones around it: after a
+        # few, what the rest would say is about those and not themselves.
+        [ "$wrongs" -lt 3 ] || break
+        [ "$n" -eq 0 ] || grid send-keys -t grid C-n
+        grid send-keys -t grid C-e C-b
+        tries=0
+        at=
+        while [ "$tries" -lt 30 ]; do
+            at=$(grid display-message -p -t grid '#{cursor_y} #{cursor_character}')
+            [ -n "$top" ] || [ "${at#* }" != "|" ] || top=$((${at%% *} - n))
+            [ "$at" = "$((${top:-0} + n)) |" ] && break
+            tries=$((tries + 1))
+            sleep 0.1
+        done
+        if [ "$at" != "$((${top:-0} + n)) |" ]; then
+            wrongs=$((wrongs + 1))
+            wrong="$wrong
+${line%%:*}: the cursor is on '${at#* }'"
+        fi
+        n=$((n + 1))
+    done < "$lines"
+    grid capture-pane -p -t grid > "$SANDBOX/grid/screen.txt" 2>/dev/null
+    grid kill-server 2>/dev/null
+    if [ -z "$wrong" ]; then
+        ok "terminal  on the grid of $version: the cursor is where Emacs put it, after each of $count awkward sequences"
+    else
+        bad "terminal  on the grid of $version: Emacs and the terminal count cells differently"
+        printf '%s\n' "$wrong" | sed 1d | cut -c1-200 | detail
+        [ "$wrongs" -lt 3 ] || printf 'and the lines after these were not looked at\n' | detail
+    fi
+    # And agreeing is not to be had by leaving text out: an accent is on
+    # the screen with its letter, a vowel sign with its consonant.  A
+    # screen that is miscounted has been reported; what is on it says no
+    # more.
+    if [ -n "$wrong" ]; then
+        :
+    elif out=$(MEGA_TEST_LINES=$lines MEGA_TEST_SCREEN="$SANDBOX/grid/screen.txt" \
+            MEGA_TEST_TOP=${top:-0} "$EMACS" -Q --batch -L "$CONFIG/lisp" \
+            -l "$TESTS/mega-screen-shown.el" 2>&1); then
+        ok "terminal  on the grid of $version: every character that was to be shown is on its line"
+    else
+        bad "terminal  on the grid of $version: characters of the text are not on the screen"
+        printf '%s\n' "$out" | cut -c1-200 | detail
+    fi
+
+    # Two: a line with such a sequence in it, and a note that comes to the
+    # end of a line and goes again.  Afterwards every line on the screen is
+    # the line of the buffer: nothing missing, nothing from another line.
+    if ! command -v git >/dev/null 2>&1; then
+        skip "terminal  on the grid: a note that comes and goes (git is not installed)"
+        return
+    fi
+    repo="$SANDBOX/grid/repo"
+    mkdir -- "$repo"
+    printf 'first line\nx\342\230\240\357\270\217\342\230\240\357\270\217\342\230\240\357\270\217 DANGER ZONE the end\nthird line\n' \
+        > "$repo/notes.txt"
+    (
+        cd -- "$repo" &&
+            GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 &&
+            export GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM &&
+            git init --quiet &&
+            git add notes.txt &&
+            git -c user.name=Ada -c user.email=ada@example.invalid \
+                -c commit.gpgsign=false commit --quiet -m 'A note'
+    ) || { bad "terminal  on the grid: could not make a repository to look at"; return; }
+    if ! grid_start "$repo/notes.txt" 12 '(setq mega-trust-ask-on-open nil)' ||
+        ! grid_wait 'notes.txt' 150; then
+        bad "terminal  on the grid of $version: Emacs did not come up on a file"
+        grid kill-server 2>/dev/null
+        return
+    fi
+    # Down to the line with the skulls, wait for its note; down again, and
+    # the note is the third line's.
+    grid send-keys -t grid C-n
+    if ! grid_wait 'the end   Ada, just now' 100; then
+        bad "terminal  on the grid of $version: the note did not come where the line ends"
+        grid capture-pane -p -t grid | sed -n 1,4p | cut -c1-200 | detail
+        grid kill-server 2>/dev/null
+        return
+    fi
+    grid send-keys -t grid C-n
+    grid_wait 'third line   Ada, just now' 100
+    # Without what stands to the right of a line: blanks, and the ruler.
+    ruler=$(printf '\342\224\202')
+    shown=$(grid capture-pane -p -t grid | sed -n 1,3p | sed "s/[ $ruler]*\$//")
+    grid kill-server 2>/dev/null
+    # The skulls without their selectors: that is how they are sent.
+    wanted=$(printf 'first line\nx\342\230\240\342\230\240\342\230\240 DANGER ZONE the end\nthird line   Ada, just now')
+    case $shown in
+        "$wanted"*)
+            ok "terminal  on the grid of $version: after a note came and went, the screen holds the buffer's lines" ;;
+        *)
+            bad "terminal  on the grid of $version: the screen does not hold the buffer's lines"
+            printf '%s\n' "$shown" | cut -c1-200 | detail ;;
+    esac
 }
 
 # --- run --------------------------------------------------------------------
