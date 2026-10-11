@@ -514,6 +514,22 @@ is called after each character as well."
          (error "Hits were lost"))))))
 
 (mega-bench-define
+ "search: show 2000 hits, the match marked in each"
+ (lambda ()
+   (require 'mega-search)
+   ;; As git grep prints them for MEGA: the match in bold, nothing else.
+   (let ((lines (mapcar (lambda (index)
+                          (format "src/part%02d/file%04d.rs:%d:    let \e[1mneedle\e[m = value_%d;"
+                                  (% index 30) index (* 3 index) index))
+                        (number-sequence 1 2000))))
+     (lambda ()
+       (let ((hits (delq nil (mapcar #'mega-search--present lines))))
+         (unless (and (= (length hits) 2000)
+                      (text-property-any 0 (length (car hits)) 'face
+                                         'mega-search-match (car hits)))
+           (error "Hits were lost, or their marks")))))))
+
+(mega-bench-define
  "search: a real one, 300 files, with grep"
  (lambda ()
    (require 'mega-search)

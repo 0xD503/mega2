@@ -86,7 +86,12 @@
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("search: a real one, 300 files, with grep"
   (:ms 4.6 :date "2026-10-10" :commit "915d253"
-   :reason "Established: the bench as rebuilt after the architecture review."))
+   :reason "Established: the bench as rebuilt after the architecture review.")
+  (:ms 5.8 :date "2026-10-10" :commit "707c47e"
+   :reason "Each hit shows what matched in its line, which was asked for.  The program is told to mark it and the marks of each line are read: four millionths of a second a hit as the bench runs MEGA, from source, and two compiled.  It was 13 ms at first, when every sequence of grep's colouring was read, a dozen a line; now grep marks the match and nothing else, the name and the number are read in one go, and a line with no mark takes the path it took before."))
+ ("search: show 2000 hits, the match marked in each"
+  (:ms 14 :date "2026-10-10" :commit "707c47e"
+   :reason "Established with the marking of what matched: the hits as git grep prints them for MEGA, one match in each.  The benchmark before this one shows the same hits unmarked."))
  ("run a program and wait for it, ten times"
   (:ms 7 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
