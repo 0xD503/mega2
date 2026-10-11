@@ -74,14 +74,16 @@ each containing the word needle in a different case."
 (ert-deftest mega-search-rg-command ()
   (mega-search-test--defaults
     (should (equal (mega-search-command 'rg "needle" nil)
-                   '("rg" "--line-number" "--no-heading" "--color=never"
+                   '("rg" "--line-number" "--no-heading"
+                     "--color=always" "--colors=match:none" "--colors=match:style:bold"
                      "--max-columns=300" "--max-columns-preview"
                      "--ignore-case" "--hidden" "--glob=!.git"
                      "--no-require-git" "--regexp=needle" ".")))
     (let ((mega-search-hidden nil) (mega-search-ignored t)
           (mega-search-literal t) (mega-search-word t))
       (should (equal (mega-search-command 'rg "Needle" '("src/*.rs"))
-                     '("rg" "--line-number" "--no-heading" "--color=never"
+                     '("rg" "--line-number" "--no-heading"
+                       "--color=always" "--colors=match:none" "--colors=match:style:bold"
                        "--max-columns=300" "--max-columns-preview"
                        "--case-sensitive" "--no-ignore" "--fixed-strings"
                        "--word-regexp" "--glob=src/*.rs" "--regexp=Needle" "."))))))
@@ -90,17 +92,26 @@ each containing the word needle in a different case."
   "The base is the user's `git grep -PnI', spelled with long options."
   (mega-search-test--defaults
     (should (equal (mega-search-command 'git "needle" nil)
-                   '("git" "--no-pager" "grep" "--line-number" "-I" "--color=never"
+                   '("git" "-c" "color.grep.match=bold" "-c" "color.grep.matchSelected=bold"
+                     "-c" "color.grep.selected=normal"
+                     "--no-pager" "grep" "--line-number" "-I" "--color=always"
+                     "--no-full-name" "--no-column"
                      "--perl-regexp" "--ignore-case"
                      "-e" "needle" "--")))
     ;; With what git does not track, when that is asked for.
     (let ((mega-search-untracked t) (mega-search-case 'sensitive))
       (should (equal (mega-search-command 'git "needle" '("src"))
-                     '("git" "--no-pager" "grep" "--line-number" "-I" "--color=never"
+                     '("git" "-c" "color.grep.match=bold" "-c" "color.grep.matchSelected=bold"
+                     "-c" "color.grep.selected=normal"
+                     "--no-pager" "grep" "--line-number" "-I" "--color=always"
+                     "--no-full-name" "--no-column"
                        "--perl-regexp" "--untracked" "-e" "needle" "--" "src"))))
     (let ((mega-search-ignored t) (mega-search-literal t) (mega-search-word t))
       (should (equal (mega-search-command 'git "Needle" nil)
-                     '("git" "--no-pager" "grep" "--line-number" "-I" "--color=never"
+                     '("git" "-c" "color.grep.match=bold" "-c" "color.grep.matchSelected=bold"
+                     "-c" "color.grep.selected=normal"
+                     "--no-pager" "grep" "--line-number" "-I" "--color=always"
+                     "--no-full-name" "--no-column"
                        "--fixed-strings" "--untracked" "--no-exclude-standard"
                        "--word-regexp" "-e" "Needle" "--"))))))
 
@@ -108,7 +119,7 @@ each containing the word needle in a different case."
   (mega-search-test--defaults
     (should (equal (mega-search-command 'grep "needle" nil)
                    '("grep" "--recursive" "--line-number"
-                     "--binary-files=without-match" "--color=never"
+                     "--binary-files=without-match" "--color=always"
                      "--exclude-dir=.git" "--perl-regexp" "--ignore-case"
                      "--regexp=needle" "--" ".")))
     (let ((mega-search-hidden nil))
@@ -624,10 +635,129 @@ session starts with."
                      (list setting (default-toplevel-value setting)))))
     ;; Which for git means: no option that widens the search.
     (let ((command (mega-search-command 'git "needle" nil)))
-      (should (equal (seq-take command 3) '("git" "--no-pager" "grep")))
+      (should (equal (car command) "git"))
+      (should (member "grep" command))
       (should-not (seq-intersection command
                                     '("--untracked" "--no-exclude-standard"
                                       "--recurse-submodules" "--no-index"))))))
+
+;;;; What matched, marked
+
+(defun mega-search-test--matched (hit)
+  "The parts of HIT, a candidate, that are marked as what matched."
+  (let ((parts nil) (position 0))
+    (while (< position (length hit))
+      (let ((next (next-single-property-change position 'face hit (length hit))))
+        (when (eq (get-text-property position 'face hit) 'mega-search-match)
+          (push (substring-no-properties hit position next) parts))
+        (setq position next)))
+    (nreverse parts)))
+
+(ert-deftest mega-search-reads-where-a-program-says-the-match-is ()
+  "Each of the three says it by colouring it, each in its own way."
+  (dolist (case '(;; git grep, told to mark the match and nothing else.
+                  ("a \e[1mneedle\e[m here, a \e[1mNeedle\e[m there"
+                   "a needle here, a Needle there" "needle" "Needle")
+                  ;; ripgrep resets before it sets.
+                  ("a \e[0m\e[1mneedle\e[0m here" "a needle here" "needle")
+                  ;; grep clears to the end of the line after each change,
+                  ;; unless it is told not to, and ends the line with a reset.
+                  ("a \e[01;31m\e[Kneedle\e[m\e[K here\e[m" "a needle here" "needle")
+                  ;; Nothing marked: the text as it is.
+                  ("a needle here" "a needle here")
+                  ;; A stretch that is never ended runs to the end of the
+                  ;; line; one that is empty is none; and a sequence that is
+                  ;; no colour at all is dropped.
+                  ("a \e[1mneedle" "a needle" "needle")
+                  ("a \e[1m\e[mneedle\e[2J" "a needle")
+                  ("\e[1mneedle\e[m" "needle" "needle")))
+    (let ((marked (mega-search--marked (car case))))
+      (ert-info ((format "%S" (car case)))
+        (should (equal (substring-no-properties marked) (nth 1 case)))
+        (should (equal (mega-search-test--matched marked) (nthcdr 2 case))))))
+  ;; A text without a mark is not even copied.
+  (let ((text "a needle here"))
+    (should (eq (mega-search--marked text) text))))
+
+(ert-deftest mega-search-a-hit-shows-what-matched-and-only-in-its-text ()
+  (let ((hit (mega-search--present
+              "\e[35msrc/needle.rs\e[m:\e[32m7\e[m:let \e[1mneedle\e[m = find(\e[1mneedle\e[m);")))
+    (should (equal (substring-no-properties hit) "src/needle.rs:7:let needle = find(needle);"))
+    ;; The name of the file has the word in it too, and a colour from the
+    ;; program: it is the name all the same, in the face of a name.
+    (should (eq (get-text-property 0 'face hit) 'mega-search-file))
+    (should (equal (mega-search-test--matched hit) '("needle" "needle")))
+    (should (equal (mega-search-parse (substring-no-properties hit))
+                   '("src/needle.rs" 7 "let needle = find(needle);"))))
+  ;; Where the program marks nothing, nothing is marked: the hit is plain.
+  (let ((hit (mega-search--present "a.txt:1:a needle")))
+    (should (equal (substring-no-properties hit) "a.txt:1:a needle"))
+    (should-not (mega-search-test--matched hit)))
+  ;; As ripgrep and grep print one, colours around the name and the number.
+  (dolist (line '("\e[0m\e[35m./hay.txt\e[0m:\e[0m\e[32m12\e[0m:a \e[0m\e[1mneedle\e[0m here"
+                  "\e[35m\e[K./hay.txt\e[m\e[K\e[36m\e[K:\e[m\e[K\e[32m\e[K12\e[m\e[K\e[36m\e[K:\e[m\e[Ka \e[01;31m\e[Kneedle\e[m\e[K here"
+                  "./hay.txt\e[m:\e[m12\e[m:\e[ma \e[m\e[01;31mneedle\e[m here\e[m"))
+    (let ((hit (mega-search--present line)))
+      (should (equal (substring-no-properties hit) "hay.txt:12:a needle here"))
+      (should (equal (mega-search-test--matched hit) '("needle")))
+      (should (eq (get-text-property 8 'face hit) 'mega-search-line))))
+  ;; What is not a hit is still not one.
+  (should-not (mega-search--present "\e[1mBinary file matches\e[m")))
+
+(ert-deftest mega-search-each-program-really-marks-what-matched ()
+  "Asked for after use.  With the real programs, on a real checkout."
+  (skip-unless (executable-find "git"))
+  (mega-search-test--defaults
+    (mega-search-test--with-repository dir
+      (dolist (backend '(git rg grep))
+        (when (executable-find (symbol-name backend))
+          (ert-info ((format "searched by %s" backend))
+            (let* ((hits (mega-search-run "needle" dir backend))
+                   (in-tracked (seq-filter
+                                (lambda (hit)
+                                  (string-prefix-p "tracked.txt:" (substring-no-properties hit)))
+                                hits)))
+              ;; Both lines of the file, the match of each in its own case.
+              (should (equal (mapcar #'substring-no-properties in-tracked)
+                             '("tracked.txt:2:a needle here" "tracked.txt:3:a Needle there")))
+              (should (equal (mapcar #'mega-search-test--matched in-tracked)
+                             '(("needle") ("Needle"))))
+              ;; No hit has kept anything of how the program said it.
+              (dolist (hit hits)
+                (should-not (string-search "\e" hit))))))))))
+
+(ert-deftest mega-search-git-settings-of-yours-do-not-change-what-a-hit-is ()
+  "Colours for a hit, names from the top of the checkout, a column number:
+each is a setting somebody has, and each would have a hit read wrongly."
+  (skip-unless (executable-find "git"))
+  (mega-search-test--defaults
+    (mega-search-test--with-repository dir
+      (dolist (setting '(("color.grep.selected" . "green") ("color.grep.match" . "normal")
+                         ("color.grep.filename" . "bold red") ("color.grep.lineNumber" . "blue")
+                         ("grep.fullName" . "true") ("grep.column" . "true")
+                         ("grep.lineNumber" . "true")))
+        (mega-search-test--git dir "config" (car setting) (cdr setting)))
+      ;; From the top of the checkout.
+      (let ((hits (mega-search-run "Needle there" dir 'git)))
+        (should (equal (mapcar #'substring-no-properties hits)
+                       '("tracked.txt:3:a Needle there")))
+        (should (equal (mega-search-test--matched (car hits)) '("Needle there"))))
+      ;; And from a directory inside it: the name is as seen from there.
+      (let* ((inside (expand-file-name "src/" dir))
+             (hits (mega-search-run "needle_finder" inside 'git)))
+        (should (equal (mapcar #'substring-no-properties hits)
+                       '("deep/code.rs:1:fn needle_finder() {}")))
+        (should (equal (mega-search-test--matched (car hits)) '("needle_finder")))))))
+
+(ert-deftest mega-search-the-buffer-of-hits-keeps-what-matched-marked ()
+  (let ((line (mega-search--for-buffer
+               (mega-search--present "a.txt:3:a \e[1mneedle\e[m here"))))
+    (should (equal (substring-no-properties line) "a.txt:3:a needle here"))
+    ;; In the way a buffer with its own colouring leaves alone, and with
+    ;; nothing else carried over from the prompt.
+    (should (eq (get-text-property 10 'font-lock-face line) 'mega-search-match))
+    (should-not (get-text-property 9 'font-lock-face line))
+    (should-not (text-property-not-all 0 (length line) 'face nil line))))
 
 (provide 'mega-search-test)
 ;;; mega-search-test.el ends here

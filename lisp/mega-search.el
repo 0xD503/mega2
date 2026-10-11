@@ -84,6 +84,8 @@ local.el to change it for good.  (`auto', an older value, means `git'.)"
   "The file name of a search hit." :group 'mega)
 (defface mega-search-line '((t :inherit xref-line-number))
   "The line number of a search hit." :group 'mega)
+(defface mega-search-match '((t :inherit match))
+  "The part of a hit's line that matched what was searched for." :group 'mega)
 
 ;;;; How to search: settings that last for the session
 
@@ -164,7 +166,10 @@ list: PATTERN and PATHS are passed as they are, never through a shell."
   (let ((ignore-case (mega-search--ignore-case-p pattern)))
     (pcase backend
       ('rg
-       `("rg" "--line-number" "--no-heading" "--color=never"
+       `("rg" "--line-number" "--no-heading"
+         ;; What matched is marked, in a way that is MEGA's and not that of
+         ;; your settings for ripgrep: see `mega-search--marked'.
+         "--color=always" "--colors=match:none" "--colors=match:style:bold"
          "--max-columns=300" "--max-columns-preview"
          ,(if ignore-case "--ignore-case" "--case-sensitive")
          ,@(when mega-search-hidden '("--hidden" "--glob=!.git"))
@@ -181,7 +186,16 @@ list: PATTERN and PATHS are passed as they are, never through a shell."
          ;; An explicit directory: with none, rg reads standard input.
          "."))
       ('git
-       `("git" "--no-pager" "grep" "--line-number" "-I" "--color=never"
+       `("git"
+         ;; What matched is marked, and nothing else of the line is,
+         ;; whatever colours your own configuration gives a hit.
+         "-c" "color.grep.match=bold" "-c" "color.grep.matchSelected=bold"
+         "-c" "color.grep.selected=normal"
+         "--no-pager" "grep" "--line-number" "-I" "--color=always"
+         ;; Names as seen from where the search runs, and no column in
+         ;; front of the text: a `grep.fullName' or `grep.column' of yours
+         ;; would have a hit read as another file, or another text.
+         "--no-full-name" "--no-column"
          ,(if mega-search-literal "--fixed-strings" "--perl-regexp")
          ,@(when ignore-case '("--ignore-case"))
          ;; Submodules, or what is not tracked: git refuses to do both.
@@ -193,7 +207,7 @@ list: PATTERN and PATHS are passed as they are, never through a shell."
          "--" ,@paths))
       ('grep
        `("grep" "--recursive" "--line-number" "--binary-files=without-match"
-         "--color=never" "--exclude-dir=.git"
+         "--color=always" "--exclude-dir=.git"
          ,(if mega-search-literal "--fixed-strings" "--perl-regexp")
          ,@(when ignore-case '("--ignore-case"))
          ;; Names of a dot and something more.  Plain ".*" would take in
@@ -216,13 +230,74 @@ list: PATTERN and PATHS are passed as they are, never through a shell."
           (string-to-number (match-string 2 line))
           (match-string 3 line))))
 
+(defconst mega-search--marked-hit
+  (let ((colour "\\(?:\e\\[[0-9;?]*[A-Za-z]\\)*"))
+    (concat "\\`" colour "\\(?:\\./\\)?\\([^\e]+?\\)" colour
+            ":" colour "\\([0-9]+\\)" colour ":" colour "\\(.*\\)\\'"))
+  "A hit as a program prints it when it colours: FILE, LINE-NUMBER, TEXT.
+Like the pattern of `mega-search-parse', with room for the terminal's
+colour sequences around the name and the number, which some programs
+colour whatever they are told.  Read in one go: these are in every
+line, and of no interest.")
+
+(defun mega-search--marked (text)
+  "Return TEXT without the terminal's colour sequences, the match in a face.
+This is how a search program says where in a line the match is: it
+colours it.  Each is told to colour the match and nothing else of the
+text; and nothing is taken on trust beyond that.  A sequence that sets
+something starts a stretch, one that resets ends it, and any other
+sequence is dropped."
+  (if (not (string-search "\e" text))
+      text
+    (let ((pieces nil) (ranges nil) (length 0) (from 0) (open nil))
+      (while (string-match "\e\\[\\([0-9;?]*\\)\\([A-Za-z]\\)" text from)
+        (let ((start (match-beginning 0)))
+          (when (> start from)
+            (push (substring text from start) pieces)
+            (setq length (+ length (- start from))))
+          (setq from (match-end 0))
+          (when (eq (aref text (1- from)) ?m)
+            ;; `1' and `01;31' set something; `', `0' and `00' reset.
+            (if (string-match-p "[1-9]" (match-string 1 text))
+                (unless open (setq open length))
+              (when (and open (> length open))
+                (push (cons open length) ranges))
+              (setq open nil)))))
+      (when (< from (length text))
+        (push (substring text from) pieces)
+        (setq length (+ length (- (length text) from))))
+      (when (and open (> length open))
+        (push (cons open length) ranges))
+      (let ((clean (apply #'concat (nreverse pieces))))
+        (dolist (range ranges)
+          (put-text-property (car range) (cdr range) 'face 'mega-search-match clean))
+        clean))))
+
 (defun mega-search--present (line)
-  "Return LINE as a candidate: FILE:LINE:TEXT, with the first two in faces."
-  (pcase (mega-search-parse line)
-    (`(,file ,number ,text)
-     (concat (propertize file 'face 'mega-search-file) ":"
-             (propertize (number-to-string number) 'face 'mega-search-line) ":"
-             text))))
+  "Return LINE as a candidate: FILE:LINE:TEXT, with faces.
+The file and the line number have theirs; so has what matched, where
+the program that searched has said which part of the line that is."
+  (if (not (string-search "\e" line))
+      ;; Nothing is marked: the line as it is.
+      (pcase (mega-search-parse line)
+        (`(,file ,number ,text)
+         (concat (propertize file 'face 'mega-search-file) ":"
+                 (propertize (number-to-string number) 'face 'mega-search-line) ":"
+                 text)))
+    (when (string-match mega-search--marked-hit line)
+      (let ((file (match-string 1 line))
+            (number (match-string 2 line))
+            (text (match-string 3 line)))
+        (concat (propertize file 'face 'mega-search-file) ":"
+                (propertize number 'face 'mega-search-line) ":"
+                (mega-search--marked text))))))
+
+(defconst mega-search--grep-colours
+  '("GREP_COLORS=mt=01;31:ms=01;31:mc=01;31:sl=:cx=:fn=:ln=:bn=:se=:ne"
+    "GREP_COLOR=")
+  "What grep is to colour: what matched, and nothing else.
+Grep takes that from the environment and not from an option.  Whatever
+yours says about grep's colours stays yours, in your terminal.")
 
 (defun mega-search-run (input &optional directory backend limit)
   "Search DIRECTORY for INPUT with BACKEND and return the hits as strings.
@@ -235,7 +310,11 @@ than `mega-search-min-input' finds nothing, without running anything."
          (split (mega-search-split input))
          (pattern (car split)))
     (when (and backend (>= (length pattern) mega-search-min-input))
-      (let ((command (mega-search-command backend pattern (cdr split))))
+      (let ((command (mega-search-command backend pattern (cdr split)))
+            (process-environment (if (eq backend 'grep)
+                                     (append mega-search--grep-colours
+                                             process-environment)
+                                   process-environment)))
         (delq nil
               (mapcar #'mega-search--present
                       (mega-exec-lines (car command) (cdr command)
@@ -383,6 +462,19 @@ DOC is its docstring."
        (pulse-momentary-highlight-one-line (point)))
      t)))
 
+(defun mega-search--for-buffer (hit)
+  "HIT, a candidate, as a line of the buffer of hits.
+Plain, but for what matched: `grep-mode' colours the rest by itself,
+and would take away a face it had not put there."
+  (let ((line (substring-no-properties hit))
+        (position 0))
+    (while (< position (length hit))
+      (let ((next (next-single-property-change position 'face hit (length hit))))
+        (when (eq (get-text-property position 'face hit) 'mega-search-match)
+          (put-text-property position next 'font-lock-face 'mega-search-match line))
+        (setq position next)))
+    line))
+
 (defun mega-search-results-buffer (input directory backend)
   "Show every hit for INPUT under DIRECTORY in a buffer.
 The buffer is in `grep-mode': `n'/`p' and RET move between hits, and `e'
@@ -400,7 +492,7 @@ makes them editable in place."
                         (let ((mega-search--backend backend)) (mega-search-describe))
                         (length hits)))
         (dolist (hit hits)
-          (insert (substring-no-properties hit) "\n")))
+          (insert (mega-search--for-buffer hit) "\n")))
       (grep-mode)
       (goto-char (point-min)))
     (pop-to-buffer buffer)))
