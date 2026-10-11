@@ -9,6 +9,20 @@ A terminal-first Emacs configuration that needs nothing but Emacs 31.1: no
 packages, no downloads. This page is the whole user guide. How and why it is
 built is in [DESIGN.md](DESIGN.md).
 
+## Why
+
+MEGA began as a complaint. The big Emacs frameworks, proved buggy and sluggish
+in daily use. They were unstable, now and then took Emacs down with a segfault,
+and, worst of all, a bug of theirs could change the text in a buffer. An editor
+can be forgiven a great deal, but not that.
+
+So MEGA is built to keep your text as you typed it and to stay up, before
+anything else. And it is whole from the first start: good enough as it
+comes, with no package to download. It would go on working after a nuclear
+war, with nowhere left to download from. Until then you can still add
+things; the parsers for syntax highlighting, for one, are fetched when you
+say yes.
+
 ## Install, update, remove
 
 MEGA is this repository, cloned to where Emacs is told to look:
