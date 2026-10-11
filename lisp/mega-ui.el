@@ -19,10 +19,53 @@
 
 ;;;; Theme
 ;;
-;; The theme is a file of MEGA's own, next to this one.
+;; The themes are files of MEGA's own, next to this one, and one of them is
+;; on.  What they have in common is in mega-themes.el.
+
+(defconst mega-themes '(mega-nord mega-hacker)
+  "The themes MEGA comes with.
+`mega-nord' is the Nord palette; `mega-hacker' is green on black.")
+
+(defcustom mega-theme 'mega-nord
+  "The theme MEGA starts with: one of `mega-themes'.
+Set it in local.el.  `M-x mega-theme' changes the theme of a session."
+  :type '(choice (const mega-nord) (const mega-hacker))
+  :group 'mega)
 
 (add-to-list 'custom-theme-load-path mega-lisp-dir)
-(load-theme 'mega-nord :no-confirm)
+
+(defun mega-theme (theme)
+  "Switch to THEME, one of `mega-themes', for this session.
+The theme that was on is switched off first: with two on at once a face
+that one of them leaves alone would keep the colours of the other.  To
+start with a theme, set the variable `mega-theme' in local.el."
+  (interactive
+   (list (intern (completing-read
+                  "Theme: " (mapcar #'symbol-name mega-themes) nil t nil nil
+                  (symbol-name (or (car (remq (car custom-enabled-themes)
+                                              mega-themes))
+                                   (car mega-themes)))))))
+  (unless (memq theme mega-themes)
+    (user-error "No theme of MEGA's is called %s: there are %s" theme
+                (mapconcat #'symbol-name mega-themes ", ")))
+  (mapc #'disable-theme custom-enabled-themes)
+  (load-theme theme :no-confirm)
+  (when (called-interactively-p 'interactive)
+    (message "The theme is %s; (setq mega-theme '%s) in local.el keeps it"
+             theme theme)))
+
+(defun mega-ui-start-theme ()
+  "Switch on the theme `mega-theme' names.
+A name in local.el that is not a theme must not cost the colours: then
+the one MEGA has always had is on, and what was asked for is said."
+  (if (memq mega-theme mega-themes)
+      (mega-theme mega-theme)
+    (mega-theme 'mega-nord)
+    (display-warning
+     'mega (format "No theme of MEGA's is called %s: there are %s"
+                   mega-theme (mapconcat #'symbol-name mega-themes ", ")))))
+
+(mega-ui-start-theme)
 
 ;;;; Modeline
 ;;

@@ -738,6 +738,39 @@ copy as native code.  Anything else: from source."
     (when (equal (face-attribute 'default :background) "#2E3440")
       (mega-terminal-probe--problem "the theme was applied with only %s colours"
                                     (display-color-cells))))
+  ;; The other theme, switched to as `M-x mega-theme' does it, and back:
+  ;; its colours reach the screen where there are colours enough, and
+  ;; nothing of the first is left under them.
+  (condition-case err
+      (progn
+        (mega-theme 'mega-hacker)
+        (redisplay t)
+        (unless (equal custom-enabled-themes '(mega-hacker))
+          (mega-terminal-probe--problem "after switching, the themes are %S"
+                                        custom-enabled-themes))
+        (if (>= (display-color-cells) 256)
+            (unless (and (equal (face-attribute 'default :background) "#0A0F0C")
+                         (equal (face-attribute 'default :foreground) "#A6E3B4")
+                         (equal (face-attribute 'font-lock-string-face :foreground)
+                                "#4DFF88"))
+              (mega-terminal-probe--problem
+               "the other theme gives %s on %s, strings %s"
+               (face-attribute 'default :foreground)
+               (face-attribute 'default :background)
+               (face-attribute 'font-lock-string-face :foreground)))
+          (when (equal (face-attribute 'default :background) "#0A0F0C")
+            (mega-terminal-probe--problem
+             "the other theme was applied with only %s colours"
+             (display-color-cells))))
+        (mega-theme 'mega-nord)
+        (redisplay t)
+        (unless (and (equal custom-enabled-themes '(mega-nord))
+                     (or (< (display-color-cells) 256)
+                         (equal (face-attribute 'default :background) "#2E3440")))
+          (mega-terminal-probe--problem "switching back left %S on %s"
+                                        custom-enabled-themes
+                                        (face-attribute 'default :background))))
+    (error (mega-terminal-probe--problem "switching the theme failed: %S" err)))
   (unless (eql (frame-parameter nil 'menu-bar-lines) 0)
     (mega-terminal-probe--problem "the menu bar is showing"))
   (with-temp-buffer
