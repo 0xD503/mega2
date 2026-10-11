@@ -1,5 +1,10 @@
 # MEGA 2.0 — Make Emacs Great Again
 
+> **☠️☠️☠️ DANGER ZONE! VIBE-CODED 💀💀💀**
+>
+> This was written by an AI model at its user's direction. It is tested, and
+> nobody has read every line of it: use it knowing that.
+
 A terminal-first Emacs configuration that needs nothing but Emacs 31.1: no
 packages, no downloads. This page is the whole user guide. How and why it is
 built is in [DESIGN.md](DESIGN.md).
