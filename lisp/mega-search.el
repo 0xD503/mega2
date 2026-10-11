@@ -500,10 +500,32 @@ makes them editable in place."
 ;;;; The commands
 
 ;;;###autoload
+(defun mega-search-quote (text)
+  "TEXT as what to type to find TEXT itself, as the search is set now.
+Every character that means something in a regular expression gets a
+backslash; unless the pattern is taken literally anyway."
+  (if mega-search-literal
+      text
+    (replace-regexp-in-string "[][\\^$.|?*+(){}]" "\\\\\\&" text)))
+
+(defun mega-search-word-at-point ()
+  "The word or the number the cursor is on, or nil if it is on neither.
+On, as the cursor of a terminal is on a character: right behind a word
+is not on it.  A word is what the mode takes for a name, underscores
+and all; a run of signs with no letter or digit in it is no word."
+  (let ((bounds (bounds-of-thing-at-point 'symbol)))
+    (when (and bounds (< (point) (cdr bounds)))
+      (let ((word (buffer-substring-no-properties (car bounds) (cdr bounds))))
+        (and (string-match-p "[[:alnum:]]" word)
+             word)))))
+
 (defun mega-search-project (&optional initial)
   "Search the project as you type, starting from INITIAL.
-See the Commentary of mega-search.el for the keys of the prompt."
-  (interactive)
+Called with its key, it starts from the word or the number the cursor
+is on, and from nothing if the cursor is on neither.  See the
+Commentary of mega-search.el for the keys of the prompt."
+  (interactive (list (when-let* ((word (mega-search-word-at-point)))
+                       (mega-search-quote word))))
   (let* ((directory (mega-project-directory))
          (mega-search--directory directory)
          (mega-search--backend (mega-search-backend-for directory))
@@ -534,10 +556,12 @@ is nowhere else to learn that at the moment it matters."
 
 ;;;###autoload
 (defun mega-search-symbol ()
-  "Search the project for the symbol at point."
+  "Search the project for the symbol at point.
+Also when the cursor is right behind it, which `mega-search-project'
+does not take for being on it."
   (interactive)
   (let ((symbol (thing-at-point 'symbol t)))
-    (mega-search-project (and symbol (regexp-quote symbol)))))
+    (mega-search-project (and symbol (mega-search-quote symbol)))))
 
 (provide 'mega-search)
 ;;; mega-search.el ends here

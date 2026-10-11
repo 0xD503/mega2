@@ -138,7 +138,8 @@ and `C-p` move in it, `C-v` and `M-v` by a page, `M-<` and `M->` to its first
 and last entry; `RET` takes the highlighted one, `M-j` exactly what you typed.
 
 **Searching** (`M-g a`) is done by `git grep`, as a Perl regular expression,
-and the prompt says so. Outside a checkout `git grep` cannot search, and the
+and the prompt says so. It starts with the word or the number the cursor is
+on, if it is on one, and its hits are there at once. Outside a checkout `git grep` cannot search, and the
 next of git grep, ripgrep and grep that is installed does. Each hit shows
 what matched in its line, marked, as the program that searched reports it.
 

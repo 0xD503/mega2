@@ -602,8 +602,64 @@ And git refuses --recurse-submodules together with --untracked."
         (insert "foo.bar*")
         (goto-char 2)
         (mega-search-symbol)
-        (should (equal started (regexp-quote (thing-at-point 'symbol t))))
-        (should (string-match-p "\\\\" started))))))
+        (should (equal started "foo\\.bar\\*"))
+        ;; Right behind it counts, for this command.
+        (goto-char (point-max))
+        (mega-search-symbol)
+        (should (equal started "foo\\.bar\\*"))))))
+
+(ert-deftest mega-search-quotes-for-the-program-and-not-for-emacs ()
+  "A bracket or a bar means something to the program that Emacs would let be."
+  (let ((mega-search-literal nil))
+    (should (equal (mega-search-quote "needle_1") "needle_1"))
+    (should (equal (mega-search-quote "a.b|c(d)[e]{2}^$?*+\\")
+                   "a\\.b\\|c\\(d\\)\\[e\\]\\{2\\}\\^\\$\\?\\*\\+\\\\")))
+  ;; Taken literally, nothing needs a backslash, and one would be looked for.
+  (let ((mega-search-literal t))
+    (should (equal (mega-search-quote "a.b|c") "a.b|c"))))
+
+(ert-deftest mega-search-starts-from-the-word-or-number-under-the-cursor ()
+  "Asked for after use; and from nothing where the cursor is on neither."
+  (with-temp-buffer
+    (prog-mode)
+    (insert "let total_count = price * 42;  // done")
+    (dolist (case '((1 . "let") (3 . "let")         ; on its first and its last letter
+                    (4 . nil)                       ; the space behind it
+                    (5 . "total_count") (10 . "total_count")
+                    (16 . nil) (17 . nil)           ; a space, the equals sign
+                    (25 . nil)                      ; the asterisk
+                    (27 . "42") (28 . "42")
+                    (29 . nil)                      ; the semicolon behind the number
+                    (32 . nil)))                    ; a slash
+      (goto-char (car case))
+      (ert-info ((format "the cursor on %S, at %d" (string (char-after)) (car case)))
+        (should (equal (mega-search-word-at-point) (cdr case)))))
+    ;; At the very end there is nothing under the cursor.
+    (goto-char (point-max))
+    (should-not (mega-search-word-at-point)))
+  ;; The key hands it to the prompt, as what to type to find it.
+  (mega-search-test--defaults
+    (mega-test-with-directory dir
+      (let ((default-directory dir)
+            (mega-search-backend 'grep)
+            (asked nil))
+        (cl-letf (((symbol-function 'mega-pick-read)
+                   (lambda (_prompt _source &rest options)
+                     (push (plist-get options :initial) asked)
+                     "")))
+          (with-temp-buffer
+            (setq default-directory dir)
+            (insert "size.max = 3")
+            (goto-char 2)
+            (let ((inhibit-message t))
+              (call-interactively #'mega-search-project)
+              (should (equal (car asked) "size"))
+              (goto-char 5)
+              (call-interactively #'mega-search-project)
+              (should (equal (car asked) nil))
+              (goto-char 12)
+              (call-interactively #'mega-search-project)
+              (should (equal (car asked) "3")))))))))
 
 (ert-deftest mega-search-the-prompt-says-where-its-settings-are ()
   "Reported from use: C-o, pressed where the guide did not say it had to be,
