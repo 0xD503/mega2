@@ -64,6 +64,29 @@ minibuffer list on: the keys are simply waiting in the input queue."
                                  '("apple" "banana" "mango")))))))
     (unless (equal choice "banana")
       (mega-terminal-probe--problem "the prompt returned %S, not the entry" choice)))
+  ;; A prompt that starts with a word picked up for you has it selected:
+  ;; typing replaces it, moving the cursor keeps it, RET takes it, and one
+  ;; C-g leaves, where Emacs would have the first only drop the selection.
+  (let ((fruit (lambda (keys)
+                 (mega-terminal-probe--typing keys
+                   (mega-pick-read
+                    "Fruit: "
+                    (lambda (input)
+                      (seq-filter (lambda (fruit) (string-search input fruit))
+                                  '("apple" "banana" "mango")))
+                    :initial "an" :selected t)))))
+    (dolist (case '(("RET" . "banana")
+                    ("pp RET" . "apple")
+                    ("C-e g RET" . "mango")
+                    ("C-n RET" . "mango")))
+      (let ((choice (funcall fruit (car case))))
+        (unless (equal choice (cdr case))
+          (mega-terminal-probe--problem "with its text selected, %s took %S and not %S"
+                                        (car case) choice (cdr case)))))
+    (unless (eq 'left (condition-case nil
+                          (funcall fruit "C-g RET")
+                        (quit 'left)))
+      (mega-terminal-probe--problem "one C-g did not leave a prompt whose text was selected")))
   ;; Fuzzy matching in an ordinary prompt.
   (let ((choice (mega-terminal-probe--typing "srcmn RET"
                   (completing-read "File: " '("README.md" "src/lib.rs" "src/main.rs")))))
@@ -118,6 +141,60 @@ minibuffer list on: the keys are simply waiting in the input queue."
                                           (or buffer-file-name (buffer-name))
                                           (line-number-at-pos))))
       (error (mega-terminal-probe--problem "the search failed: %S" err))))
+  ;; A hit shown without being taken: C-j, in the real prompt, where the
+  ;; list of choices has a meaning of its own for that key.  Two files with
+  ;; a hit each; the search starts from a buffer that has nothing to do
+  ;; with either.
+  (let* ((project (file-name-as-directory
+                   (make-temp-file (expand-file-name "probe-" (getenv "MEGA_TEST_SANDBOX"))
+                                   t)))
+         (first (expand-file-name "a.txt" project))
+         (second (expand-file-name "b.txt" project))
+         (default-directory project)
+         (shown nil)
+         (note (lambda (file number) (push (cons file number) shown))))
+    (with-temp-file first
+      (dotimes (_ 60) (insert "filler\n"))
+      (insert "the needle is here\n"))
+    (with-temp-file second (insert "one\nanother needle\n"))
+    (advice-add 'mega-search--show :before note)
+    (unwind-protect
+        (condition-case err
+            (save-window-excursion
+              (delete-other-windows)
+              (switch-to-buffer (get-buffer-create "mega-probe-start"))
+              ;; Shown, the next one shown, and then left with C-g.
+              (condition-case nil
+                  (mega-terminal-probe--typing "needle C-j C-n C-j C-g"
+                    (mega-search-project))
+                (quit nil))
+              ;; Both hits, one after the other; in which order is the
+              ;; search program's business.
+              (unless (and (= (length shown) 2)
+                           (member (cons first 61) shown)
+                           (member (cons second 2) shown))
+                (mega-terminal-probe--problem "C-j in the search prompt showed %S" shown))
+              (unless (equal (buffer-name (window-buffer)) "mega-probe-start")
+                (mega-terminal-probe--problem "after C-g the window shows %s"
+                                              (buffer-name (window-buffer))))
+              (when (or (get-file-buffer first) (get-file-buffer second))
+                (mega-terminal-probe--problem
+                 "a file opened only to be shown stayed open after C-g"))
+              ;; Shown and then taken: RET goes to what was shown, in a
+              ;; buffer opened as any is.
+              (setq shown nil)
+              (mega-terminal-probe--typing "needle C-j RET"
+                (mega-search-project))
+              (unless (and (= (length shown) 1)
+                           (equal buffer-file-name (car (car shown)))
+                           (= (line-number-at-pos) (cdr (car shown))))
+                (mega-terminal-probe--problem "after C-j showed %S, RET ended in %S, line %s"
+                                              shown
+                                              (or buffer-file-name (buffer-name))
+                                              (line-number-at-pos)))
+              (kill-buffer (get-buffer "mega-probe-start")))
+          (error (mega-terminal-probe--problem "showing a hit failed: %S" err)))
+      (advice-remove 'mega-search--show note)))
   ;; The file tree is a window of this frame, and goes away again.
   (condition-case err
       (let ((before (length (window-list))))

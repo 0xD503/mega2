@@ -5,6 +5,7 @@
 (require 'mega-test-helper)
 (require 'project)
 (require 'mega-search)
+(require 'mega-trust)
 (require 'ert-x)
 
 (defmacro mega-search-test--defaults (&rest body)
@@ -646,6 +647,8 @@ And git refuses --recurse-submodules together with --untracked."
         (cl-letf (((symbol-function 'mega-pick-read)
                    (lambda (_prompt _source &rest options)
                      (push (plist-get options :initial) asked)
+                     ;; Selected, so that typing something else replaces it.
+                     (should (plist-get options :selected))
                      "")))
           (with-temp-buffer
             (setq default-directory dir)
@@ -814,6 +817,170 @@ each is a setting somebody has, and each would have a hit read wrongly."
     (should (eq (get-text-property 10 'font-lock-face line) 'mega-search-match))
     (should-not (get-text-property 9 'font-lock-face line))
     (should-not (text-property-not-all 0 (length line) 'face nil line))))
+
+;;;; A hit shown without being taken
+
+(defmacro mega-search-test--showing (&rest body)
+  "Run BODY with DIR holding a.txt, a hit on its line 40, and b.txt, one on 2.
+As in a search prompt opened from a buffer of neither: START.  HITS is
+what the list of choices holds, the highlighted one first."
+  (declare (indent 0))
+  `(mega-test-with-directory dir
+     (let* ((a (apply #'mega-test-write (expand-file-name "a.txt" dir)
+                      (append (make-list 39 "filler") '("the needle" ""))))
+            (b (mega-test-write (expand-file-name "b.txt" dir) "one" "a needle" ""))
+            (start (generate-new-buffer "mega-search-test-start"))
+            (hits (list "a.txt:40:the needle" "b.txt:2:a needle"))
+            (mega-search--directory dir)
+            (mega-search--shown nil)
+            (mega-search--shown-line nil)
+            (mega-search--showed nil)
+            (mega-search--windows nil)
+            (inhibit-message t))
+       (ignore a b)
+       (cl-letf (((symbol-function 'completion-all-sorted-completions)
+                  (lambda (&rest _) hits)))
+         (unwind-protect
+             (save-window-excursion
+               (delete-other-windows)
+               (switch-to-buffer start)
+               ;; As the command does before it opens its prompt.
+               (setq mega-search--windows (current-window-configuration))
+               ,@body)
+           (mega-search--shown-end)
+           (dolist (file (list a b))
+             (when-let* ((buffer (get-file-buffer file)))
+               (with-current-buffer buffer (set-buffer-modified-p nil))
+               (kill-buffer buffer)))
+           (kill-buffer start))))))
+
+(ert-deftest mega-search-C-j-shows-the-hit-and-marks-its-line ()
+  "Asked for after use: to look at a hit without leaving the prompt."
+  (should (eq (lookup-key mega-search-map (kbd "C-j")) 'mega-search-preview))
+  (mega-search-test--showing
+    (mega-search-preview)
+    ;; In the window the search began in: the file, at the line, marked.
+    (should (equal (buffer-file-name (window-buffer)) a))
+    (should (= (with-current-buffer (window-buffer)
+                 (line-number-at-pos (window-point)))
+               40))
+    (should (eq (overlay-buffer mega-search--shown-line) (get-file-buffer a)))
+    (should (eq (overlay-get mega-search--shown-line 'face) 'mega-search-preview))
+    (should (equal (with-current-buffer (get-file-buffer a)
+                     (buffer-substring (overlay-start mega-search--shown-line)
+                                       (overlay-end mega-search--shown-line)))
+                   "the needle\n"))
+    ;; The next hit: the other file, and the one mark has moved there.
+    (setq hits (cdr hits))
+    (mega-search-preview)
+    (should (equal (buffer-file-name (window-buffer)) b))
+    (should (eq (overlay-buffer mega-search--shown-line) (get-file-buffer b)))
+    (should (= (length mega-search--shown) 2))
+    ;; Nothing highlighted, or a file that has gone since: said, no more.
+    (setq hits nil)
+    (mega-search-preview)
+    (setq hits '("gone.txt:1:x"))
+    (mega-search-preview)
+    (should (equal (buffer-file-name (window-buffer)) b))))
+
+(ert-deftest mega-search-leaving-the-prompt-puts-everything-back ()
+  (mega-search-test--showing
+    ;; One of the two files was open before, and one is changed meanwhile.
+    (let ((open-before (find-file-noselect b)))
+      (mega-search-preview)
+      (setq hits (cdr hits))
+      (mega-search-preview)
+      (should (equal mega-search--shown (list (get-file-buffer a))))
+      (mega-search--shown-end)
+      ;; The window shows what it showed; the mark is gone, from the
+      ;; file that stays open too.
+      (should (eq (window-buffer) start))
+      (should-not mega-search--shown-line)
+      (with-current-buffer open-before
+        (should-not (seq-some (lambda (overlay)
+                                (eq (overlay-get overlay 'face) 'mega-search-preview))
+                              (overlays-in (point-min) (point-max)))))
+      ;; What was opened to be shown is closed; what was open stays.
+      (should-not (get-file-buffer a))
+      (should (buffer-live-p open-before))
+      (should-not mega-search--shown)
+      (should-not mega-search--showed)))
+  (mega-search-test--showing
+    (mega-search-preview)
+    (with-current-buffer (get-file-buffer a) (insert "typed meanwhile"))
+    (mega-search--shown-end)
+    ;; A file with work in it is never thrown away.
+    (should (buffer-live-p (get-file-buffer a)))
+    (should (buffer-modified-p (get-file-buffer a)))))
+
+(ert-deftest mega-search-the-windows-put-back-are-those-from-before-the-prompt ()
+  "Found on a real terminal: taken when a hit was first shown, they had the
+prompt for their selected window, and the cursor was left in it."
+  (mega-search-test--showing
+    ;; Nothing was shown: nothing is put back, whatever the windows do.
+    (split-window)
+    (mega-search--shown-end)
+    (should (= (length (window-list)) 2))
+    (delete-other-windows)
+    ;; The command takes them before it opens its prompt...
+    (let (taken)
+      (cl-letf (((symbol-function 'mega-pick-read)
+                 (lambda (&rest _)
+                   (setq taken (list mega-search--windows mega-search--showed
+                                     (minibuffer-depth)))
+                   "")))
+        (let ((default-directory dir) (mega-search-backend 'grep))
+          (mega-search-project)))
+      (should (window-configuration-p (nth 0 taken)))
+      (should-not (nth 1 taken))
+      (should (= (nth 2 taken) 0)))
+    ;; ...and showing a hit does not take them again.
+    (let ((before mega-search--windows))
+      (mega-search-preview)
+      (should (eq mega-search--windows before))
+      (should mega-search--showed))))
+
+(ert-deftest mega-search-a-file-that-is-only-shown-asks-nothing-and-leaves-no-trace ()
+  (require 'recentf)
+  (mega-search-test--showing
+    (let* ((recentf-list '("/somewhere/else"))
+           (asked-for-parsers 'unseen)
+           (find-file-hook (cons (lambda ()
+                                   (setq asked-for-parsers treesit-auto-install-grammar)
+                                   ;; What opening a file does to the list.
+                                   (push buffer-file-name recentf-list))
+                                 find-file-hook)))
+      (mega-search-preview)
+      ;; Emacs is told not to offer a parser in the middle of a prompt...
+      (should-not asked-for-parsers)
+      ;; ...the file is not among those you opened...
+      (should (equal recentf-list '("/somewhere/else")))))
+  ;; ...and nobody is asked to trust anything for it.
+  (should-not (memq 'mega-search-preview mega-trust-opening-commands)))
+
+(ert-deftest mega-search-the-whole-command-shows-then-goes-or-gives-up ()
+  (mega-search-test--defaults
+    (mega-search-test--showing
+      (let ((default-directory dir)
+            (mega-search-backend 'grep))
+        ;; Shown, then left with C-g: back where the search began.
+        (should (equal (condition-case nil
+                           (mega-test-with-scripted-prompt
+                               (list "needle"
+                                     #'mega-search-preview
+                                     (lambda () (signal 'quit nil)))
+                             (mega-search-project))
+                         (quit 'left))
+                       'left))
+        (should (eq (window-buffer) start))
+        (should-not (get-file-buffer a))
+        ;; Shown, then taken: there, in a buffer opened as any is.
+        (setq hits (cdr hits))
+        (mega-test-with-scripted-prompt (list "a needle" #'mega-search-preview)
+          (mega-search-project))
+        (should (equal buffer-file-name b))
+        (should (= (line-number-at-pos) 2))
+        (should-not mega-search--shown-line)))))
 
 (provide 'mega-search-test)
 ;;; mega-search-test.el ends here

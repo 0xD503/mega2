@@ -139,9 +139,16 @@ and last entry; `RET` takes the highlighted one, `M-j` exactly what you typed.
 
 **Searching** (`M-g a`) is done by `git grep`, as a Perl regular expression,
 and the prompt says so. It starts with the word or the number the cursor is
-on, if it is on one, and its hits are there at once. Outside a checkout `git grep` cannot search, and the
+on, if it is on one, and its hits are there at once. That word is selected:
+type something else and it is replaced, move the cursor and it stays to be
+added to. Outside a checkout `git grep` cannot search, and the
 next of git grep, ripgrep and grep that is installed does. Each hit shows
 what matched in its line, marked, as the program that searched reports it.
+
+`RET` goes to the highlighted hit. `C-j` only shows it: in the window you
+searched from, its line in the middle and marked, with the prompt still open,
+so you can go down the list and look at the next. `C-g` then leaves
+everything as it was, and closes a file that was opened only to be shown.
 
 How it searches is changed in that prompt, while it is open and you are
 typing what to look for: `C-o` and then a letter. (Anywhere else `C-o` is

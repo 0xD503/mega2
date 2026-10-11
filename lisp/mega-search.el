@@ -32,6 +32,14 @@
 ;;   C-o e    put every hit in a buffer you can navigate and edit
 ;;   C-o ?    show the current settings
 ;;
+;; And one key shows a hit without taking it:
+;;
+;;   C-j      show the highlighted hit where the search was started from,
+;;            its line in the middle of the window; the prompt stays open
+;;   RET      go to it, as ever
+;;   C-g      leave: the windows are as they were, and a file that was
+;;            opened only to be shown is closed again
+;;
 ;; The settings stay for the session.  To search only part of the project,
 ;; add a path or glob after " -- ":   handler -- src/*.rs
 ;;
@@ -86,6 +94,8 @@ local.el to change it for good.  (`auto', an older value, means `git'.)"
   "The line number of a search hit." :group 'mega)
 (defface mega-search-match '((t :inherit match))
   "The part of a hit's line that matched what was searched for." :group 'mega)
+(defface mega-search-preview '((t :inherit highlight :extend t))
+  "The line of a hit that is shown while the prompt is open." :group 'mega)
 
 ;;;; How to search: settings that last for the session
 
@@ -112,6 +122,21 @@ Git then searches what is tracked and nothing else: it will not do both.")
   "Directory names the active search passes over, unless it includes ignored files.
 Set for a project without version control: see `mega-project-left-out'.")
 (defvar mega-search--export nil "Set by `mega-search-export' as it leaves the prompt.")
+(defvar mega-search--shown nil
+  "The buffers that were opened to show a hit, while the prompt is open.")
+(defvar mega-search--shown-line nil
+  "The overlay on the line of the hit that is shown, if one is.")
+(defvar mega-search--windows nil
+  "How the windows were when the search began.
+Taken before the prompt opens, and not when a hit is first shown: by
+then the prompt is the selected window, and putting that back after it
+has closed leaves the cursor in a prompt that is not there.")
+(defvar mega-search--showed nil
+  "Non-nil once a hit was shown, in the prompt that is open.")
+
+;; Emacs's own; bound around the opening of a file that is only shown.
+(defvar treesit-auto-install-grammar)
+(defvar recentf-list)
 
 ;;;; Choosing the program
 
@@ -445,8 +470,67 @@ DOC is its docstring."
 (defvar mega-search-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-o") mega-search-options-map)
+    (define-key map (kbd "C-j") #'mega-search-preview)
     map)
   "Extra keys of the search prompt.")
+
+;;;; Showing a hit without taking it
+
+(defun mega-search--show (file number)
+  "Show line NUMBER of FILE in the window the prompt was opened from.
+The prompt stays where the cursor is."
+  (let* ((window (or (minibuffer-selected-window) (selected-window)))
+         (buffer (or (get-file-buffer file)
+                     ;; Opened to be looked at, and for nothing else: Emacs
+                     ;; is not to ask about a parser for it in the middle of
+                     ;; a prompt, nor to count it among the files you opened.
+                     (let ((treesit-auto-install-grammar nil)
+                           (recentf-list (bound-and-true-p recentf-list))
+                           (inhibit-message t))
+                       (car (push (find-file-noselect file t)
+                                  mega-search--shown))))))
+    (setq mega-search--showed t)
+    (with-selected-window window
+      (switch-to-buffer buffer t t)
+      (goto-char (point-min))
+      (forward-line (1- number))
+      (ignore-errors (recenter))
+      (if (overlayp mega-search--shown-line)
+          (move-overlay mega-search--shown-line
+                        (line-beginning-position) (line-beginning-position 2)
+                        buffer)
+        (setq mega-search--shown-line
+              (make-overlay (line-beginning-position) (line-beginning-position 2)))
+        (overlay-put mega-search--shown-line 'face 'mega-search-preview)))))
+
+(defun mega-search-preview ()
+  "Show the highlighted hit where the search was started, and stay in the prompt.
+Its line is put in the middle of the window and marked.  RET then goes
+to a hit as ever; leaving the prompt any other way puts the windows
+back as they were."
+  (interactive)
+  (pcase (when-let* ((hit (car (completion-all-sorted-completions))))
+           (and (stringp hit) (mega-search-parse (substring-no-properties hit))))
+    (`(,file ,number ,_)
+     (let ((file (expand-file-name file mega-search--directory)))
+       (if (file-readable-p file)
+           (mega-search--show file number)
+         (minibuffer-message "That file is gone"))))
+    (_ (minibuffer-message "No hit to show"))))
+
+(defun mega-search--shown-end ()
+  "Undo what showing hits has done: the mark, the windows, the files opened."
+  (when (overlayp mega-search--shown-line)
+    (delete-overlay mega-search--shown-line))
+  (when (and mega-search--showed mega-search--windows)
+    (set-window-configuration mega-search--windows))
+  (dolist (buffer mega-search--shown)
+    ;; A file you have changed meanwhile is not thrown away, come what may.
+    (when (and (buffer-live-p buffer) (not (buffer-modified-p buffer)))
+      (kill-buffer buffer)))
+  (setq mega-search--shown-line nil
+        mega-search--showed nil
+        mega-search--shown nil))
 
 ;;;; Going to a hit, and the results buffer
 
@@ -499,7 +583,6 @@ makes them editable in place."
 
 ;;;; The commands
 
-;;;###autoload
 (defun mega-search-quote (text)
   "TEXT as what to type to find TEXT itself, as the search is set now.
 Every character that means something in a regular expression gets a
@@ -519,10 +602,12 @@ and all; a run of signs with no letter or digit in it is no word."
         (and (string-match-p "[[:alnum:]]" word)
              word)))))
 
+;;;###autoload
 (defun mega-search-project (&optional initial)
   "Search the project as you type, starting from INITIAL.
 Called with its key, it starts from the word or the number the cursor
-is on, and from nothing if the cursor is on neither.  See the
+is on, and from nothing if the cursor is on neither.  What it starts
+from is selected: type, and what you type takes its place.  See the
 Commentary of mega-search.el for the keys of the prompt."
   (interactive (list (when-let* ((word (mega-search-word-at-point)))
                        (mega-search-quote word))))
@@ -530,16 +615,25 @@ Commentary of mega-search.el for the keys of the prompt."
          (mega-search--directory directory)
          (mega-search--backend (mega-search-backend-for directory))
          (mega-search--left-out (mega-project-left-out directory))
-         (mega-search--export nil))
+         (mega-search--export nil)
+         (mega-search--shown nil)
+         (mega-search--shown-line nil)
+         (mega-search--showed nil)
+         (mega-search--windows (current-window-configuration)))
     (unless mega-search--backend
       (user-error "No search program found: install ripgrep, or use this in a git repository"))
-    (let ((choice (mega-pick-read
-                   (mega-search-prompt directory mega-search--backend)
-                   #'mega-search-run
-                   :category 'mega-search
-                   :initial initial
-                   :history 'mega-search-history
-                   :keymap mega-search-map)))
+    (let ((choice (unwind-protect
+                      (mega-pick-read
+                       (mega-search-prompt directory mega-search--backend)
+                       #'mega-search-run
+                       :category 'mega-search
+                       :initial initial
+                       :selected t
+                       :history 'mega-search-history
+                       :keymap mega-search-map)
+                    ;; However the prompt was left: by a choice, which is
+                    ;; gone to from where the search began, or by C-g.
+                    (mega-search--shown-end))))
       (cond (mega-search--export
              (mega-search-results-buffer choice directory mega-search--backend))
             ((mega-search-visit choice directory))

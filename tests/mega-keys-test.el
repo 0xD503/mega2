@@ -289,9 +289,9 @@ nothing bound that is not listed."
 (ert-deftest mega-keys-no-keymap-of-mega-s-is-missing-from-the-sheet ()
   "A module that grows a keymap of its own has to say so here."
   (let ((described (cons 'mega-keys-mode-map
-                         ;; The prompt's map holds one key, C-o, which leads
-                         ;; to the options map; that one is described.
-                         (cons 'mega-search-map
+                         ;; What follows C-o in the search prompt is a map
+                         ;; of its own, described with the prompt's.
+                         (cons 'mega-search-options-map
                                (mapcar #'cadr mega-keys-elsewhere))))
         (found nil))
     (dolist (file (directory-files (expand-file-name "lisp" mega-dir) t "\\.el\\'"))

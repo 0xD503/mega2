@@ -174,7 +174,7 @@ project shell; editable grep results; GUD debuggers (gdb, lldb, pdb).
 | Popup | Child-frame popup primitive |
 | Completion menu | Appears as you type; fed by the language server, snippets and the buffer |
 | Live picker | Minibuffer picker with async sources, in-place toggles, export |
-| Project search | What matched is marked in each hit: the program is asked to colour it, with settings of MEGA's own so that yours do not matter, and the colour is read as the mark. `git grep -PnI` by default, `rg --hidden` or `grep` one key away (`C-o b`, which lasts for the session); toggles for case, untracked, ignored, submodules, hidden, literal/word, file glob |
+| Project search | `C-j` shows the highlighted hit without leaving the prompt, and leaving it otherwise than by a choice puts the windows back and closes what was opened to be shown. It starts from the word or number under the cursor. What matched is marked in each hit: the program is asked to colour it, with settings of MEGA's own so that yours do not matter, and the colour is read as the mark. `git grep -PnI` by default, `rg --hidden` or `grep` one key away (`C-o b`, which lasts for the session); toggles for case, untracked, ignored, submodules, hidden, literal/word, file glob |
 | Project files | Emacs's own `C-c p f`, matching fuzzily. In a checkout the list is version control's; in a project without one MEGA lists it (`fd`, which is `fdfind` on some systems, else `rg --files`, else `find`) and leaves out what a build made. Not cached |
 | Tasks | Build / run / test per project, with jump to error |
 | Format on save | editorconfig, then the language server or the language's own tool (rustfmt on the buffer; `cargo fmt` project-wide) |
@@ -491,6 +491,12 @@ Things learned while building it, worth keeping in mind:
   of a session would, and replaces only the step that runs git and the
   compiler; and it takes away every program first, in case the stand-in
   does not hold, which it did not at the first try.
+- A window layout saved while a prompt is open has the prompt for its
+  selected window. Put back after the prompt has closed, it leaves the
+  cursor in a prompt that is not there, and Emacs waiting for keys nobody
+  can give it. The layout that showing a hit puts back is taken before
+  the prompt opens. The unit tests have no prompt and passed; the
+  terminal stage, which has one, stopped answering.
 - Tests are worth only what they can fail on. Each milestone's safety,
   privacy and security checks were run against deliberately broken copies
   of the code (`MEGA_TEST_CONFIG` points the suite at a copy).
