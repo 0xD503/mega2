@@ -690,5 +690,203 @@ way out would be one more change than they wrote down."
     (should (equal (with-temp-buffer (insert-file-contents file) (buffer-string))
                    "hello\n"))))
 
+;;;; Showing what an undo did
+
+(defmacro mega-undo-test--as-a-command (&rest body)
+  "Run BODY as Emacs runs a command: the hooks before, BODY, the hooks after."
+  (declare (indent 0))
+  `(let ((inhibit-message t))
+     (run-hooks 'pre-command-hook)
+     (undo-boundary)
+     (prog1 (progn ,@body)
+       (undo-boundary)
+       (run-hooks 'post-command-hook))))
+
+(defun mega-undo-test--press-undo ()
+  "Press `C-/' once, as the first undo of a row."
+  (mega-undo-test--as-a-command
+    (let ((last-command nil))
+      (undo))))
+
+(defun mega-undo-test--marked ()
+  "The pieces of text the last undo marked, in the order they stand in."
+  (sort (mapcar (lambda (mark)
+                  (should (eq (overlay-get mark 'face) 'mega-undo-put-back))
+                  (buffer-substring-no-properties (overlay-start mark)
+                                                  (overlay-end mark)))
+                (seq-filter #'overlay-buffer mega-undo--marks))
+        #'string<))
+
+(defmacro mega-undo-test--typed (&rest body)
+  "Run BODY in a buffer where \"colu\" and then \"mn = true\" were typed.
+After a line that was there before, each in a step of its own."
+  (declare (indent 0))
+  `(with-temp-buffer
+     (buffer-enable-undo)
+     (insert "[grep]\n")
+     (undo-boundary)
+     (dolist (step '("colu" "mn = true"))
+       (mega-undo-test--as-a-command (insert step)))
+     (unwind-protect
+         (progn ,@body)
+       (mega-undo--clear)
+       (setq mega-undo--pending nil)
+       (remove-hook 'post-command-hook #'mega-undo--announce))))
+
+(ert-deftest mega-undo-what-an-undo-takes-away-is-said ()
+  "From use: one undo took the second half of a word, and nothing said so
+but the word \"Undo\"."
+  (mega-undo-test--typed
+    (setq mega-undo-said nil)
+    (mega-undo-test--press-undo)
+    (should (equal (buffer-string) "[grep]\ncolu"))
+    ;; Emacs's own word for it comes first, when it is in the echo area;
+    ;; in a test there is none.
+    (should (equal mega-undo-said "Removed \"mn = true\""))
+    (should-not mega-undo--marks)
+    (cl-letf (((symbol-function 'current-message) (lambda () "Undo")))
+      (mega-undo-test--press-undo)
+      ;; That undid the undo, as a second press after another key does.
+      (should (equal (buffer-string) "[grep]\ncolumn = true"))
+      (should (equal mega-undo-said "Undo: put back \"mn = true\"")))
+    (cl-letf (((symbol-function 'current-message) (lambda () "Redo in region")))
+      (should (equal (mega-undo--word) "Redo in region")))
+    (cl-letf (((symbol-function 'current-message) (lambda () "Undo: put back")))
+      (should-not (mega-undo--word)))))
+
+(ert-deftest mega-undo-what-an-undo-puts-back-is-marked ()
+  (mega-undo-test--typed
+    (mega-undo-test--as-a-command
+      (delete-region (- (point-max) 9) (point-max)))
+    (should (equal (buffer-string) "[grep]\ncolu"))
+    (should-not mega-undo--marks)
+    (mega-undo-test--press-undo)
+    (should (equal (buffer-string) "[grep]\ncolumn = true"))
+    (should (equal (mega-undo-test--marked) '("mn = true")))
+    (should (equal mega-undo-said "Put back \"mn = true\""))
+    ;; What is typed beside it is no part of the mark.
+    (let ((mark (car mega-undo--marks)))
+      (goto-char (overlay-start mark))
+      (let ((inhibit-modification-hooks t)) (insert "!"))
+      (should (equal (buffer-substring (overlay-start mark) (overlay-end mark))
+                     "mn = true"))
+      (delete-region (1- (overlay-start mark)) (overlay-start mark)))
+    ;; It is gone at the next key.
+    (should (memq 'mega-undo--clear (default-value 'pre-command-hook)))
+    (run-hooks 'pre-command-hook)
+    (should-not mega-undo--marks)
+    (should-not (overlays-in (point-min) (point-max)))
+    (should-not (memq 'mega-undo--clear (default-value 'pre-command-hook)))
+    (should-not mega-undo--timer)))
+
+(ert-deftest mega-undo-a-mark-does-not-outstay-its-moment ()
+  (mega-undo-test--typed
+    (mega-undo-test--as-a-command
+      (delete-region (- (point-max) 9) (point-max)))
+    (let ((mega-undo-show-seconds 0.05))
+      (mega-undo-test--press-undo))
+    (should mega-undo--marks)
+    (should (timerp mega-undo--timer))
+    (should (mega-test-wait-for (lambda () (null mega-undo--marks)) 5))
+    (should-not (overlays-in (point-min) (point-max)))
+    (should-not mega-undo--timer)
+    (should-not (memq 'mega-undo--clear (default-value 'pre-command-hook)))))
+
+(ert-deftest mega-undo-much-undone-is-counted-and-not-all-marked ()
+  (with-temp-buffer
+    (buffer-enable-undo)
+    (insert "one\ttwo\nthree four five six seven eight nine ten eleven twelve\n")
+    (undo-boundary)
+    (unwind-protect
+        (progn
+          ;; One command that removes text in three places.
+          (mega-undo-test--as-a-command
+            (goto-char (point-min))
+            (while (re-search-forward "t[a-z]+" nil t)
+              (replace-match "")))
+          (should (equal (buffer-string)
+                         "one\t\n four five six seven eight nine  eleven \n"))
+          (let ((mega-undo--show-most 2))
+            (mega-undo-test--press-undo))
+          (should (equal (buffer-string)
+                         "one\ttwo\nthree four five six seven eight nine ten eleven twelve\n"))
+          ;; Emacs undoes from the end of the text backwards.
+          (should (equal mega-undo-said
+                         "Put back 17 characters in 4 places (\"twelve…\")"))
+          (should (equal (length mega-undo--marks) 2))
+          ;; All of it gone again, in one piece too long to quote in full;
+          ;; a line end and a tab are shown as what they are.
+          (mega-undo--clear)
+          (mega-undo-test--as-a-command (erase-buffer))
+          (mega-undo-test--press-undo)
+          (should (equal mega-undo-said
+                         (concat "Put back 63 characters "
+                                 "(\"one\\ttwo\\nthree four five six seven eight …\")")))
+          (mega-undo-test--as-a-command (goto-char (point-min)) (insert "a\tb\n"))
+          (mega-undo-test--press-undo)
+          (should (equal mega-undo-said "Removed \"a\\tb\\n\"")))
+      (mega-undo--clear)
+      (setq mega-undo--pending nil)
+      (remove-hook 'post-command-hook #'mega-undo--announce))))
+
+(ert-deftest mega-undo-looking-on-changes-nothing ()
+  "The text and the history are what Emacs alone would have left."
+  (cl-flet ((history (show)
+              (let ((mega-undo-show show))
+                (mega-undo-test--typed
+                  (mega-undo-test--press-undo)
+                  (mega-undo-test--as-a-command (insert "x"))
+                  (mega-undo-test--press-undo)
+                  (mega-undo-test--as-a-command
+                    (let ((last-command 'undo)) (undo-more 1)))
+                  (list (buffer-string)
+                        (mega-undo-encode buffer-undo-list
+                                          (mega-undo-origin buffer-undo-list t))
+                        (buffer-modified-p))))))
+    (should (equal (history t) (history nil))))
+  ;; Switched off, it neither marks nor speaks.
+  (let ((mega-undo-show nil))
+    (mega-undo-test--typed
+      (setq mega-undo-said nil)
+      (mega-undo-test--as-a-command
+        (delete-region (- (point-max) 9) (point-max)))
+      (mega-undo-test--press-undo)
+      (should-not mega-undo--marks)
+      (should-not mega-undo-said)))
+  ;; And a change that is not an undo is none of its business: typing
+  ;; leaves no hook behind and nothing waiting to be said.
+  (mega-undo-test--typed
+    (mega-undo-test--as-a-command (insert " # typed"))
+    (mega-undo-test--as-a-command (delete-region (point-min) (1+ (point-min))))
+    (should-not mega-undo--pending)
+    (should-not mega-undo--marks)
+    (should-not (memq 'mega-undo--announce (default-value 'post-command-hook)))))
+
+(ert-deftest mega-undo-looking-on-cannot-break-the-hook-it-is-on ()
+  "Emacs empties `after-change-functions' when a function on it signals."
+  (should (memq 'mega-undo--changed (default-value 'after-change-functions)))
+  (mega-undo-test--typed
+    (mega-undo-test--as-a-command
+      (delete-region (- (point-max) 9) (point-max)))
+    (cl-letf (((symbol-function 'mega-undo--note)
+               (lambda (&rest _) (error "Broken on purpose"))))
+      (mega-undo-test--press-undo))
+    (should (equal (buffer-string) "[grep]\ncolumn = true"))
+    (should (memq 'mega-undo--changed (default-value 'after-change-functions)))))
+
+(ert-deftest mega-undo-a-step-in-the-tree-shows-what-it-did ()
+  (mega-undo-test--typed
+    (let ((buffer (current-buffer)))
+      (setq mega-undo-said nil)
+      (mega-undo-test--as-a-command
+        (mega-undo-tree-go buffer #'mega-undo-tree-parent))
+      (should (equal (buffer-string) "[grep]\ncolu"))
+      (should (equal mega-undo-said "Removed \"mn = true\""))
+      (mega-undo-test--as-a-command
+        (mega-undo-tree-go buffer #'mega-undo-tree-child))
+      (should (equal (buffer-string) "[grep]\ncolumn = true"))
+      (should (equal mega-undo-said "Put back \"mn = true\""))
+      (should (equal (mega-undo-test--marked) '("mn = true"))))))
+
 (provide 'mega-undo-test)
 ;;; mega-undo-test.el ends here

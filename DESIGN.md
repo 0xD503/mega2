@@ -183,7 +183,7 @@ project shell; editable grep results; GUD debuggers (gdb, lldb, pdb).
 | Snippets | LSP-syntax tab stops; user snippets per mode |
 | Dev Containers | See below |
 | Claude | Project session in a tmux pane or a terminal buffer; one-shot ask, explain and rewrite-with-diff through `claude --print` |
-| Undo | Tree drawn from Emacs's own undo list; history persisted per file |
+| Undo | Tree drawn from Emacs's own undo list; history persisted per file. What an undo did is shown, by the key or by a step in the tree: the echo area names what it took away, and what it put back is marked where it stands until the next key or for two seconds. It looks on while Emacs undoes and changes neither text nor history |
 | Debugging | Picks the debugger and the program for the project; one set of keys for gdb, lldb and pdb. On the host through GUD, in a container through a debug adapter |
 | Debug adapter client | Own client for the Debug Adapter Protocol: breakpoints that outlive sessions, stack, variables, output |
 | Workspaces | The open files and the window layout, saved under a name and resumed |

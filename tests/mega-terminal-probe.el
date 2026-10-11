@@ -452,6 +452,7 @@ looks for the picture itself in what the terminal was sent."
   (declare-function mega-undo-tree "mega-undo-tree")
   (declare-function mega-undo-tree-backward "mega-undo-tree")
   (declare-function mega-undo-tree-cancel "mega-undo-tree")
+  (defvar mega-undo-said)
   (condition-case err
       (save-window-excursion
         (unless (eq (key-binding (kbd "C-x u")) 'mega-undo-tree)
@@ -498,7 +499,59 @@ looks for the picture itself in what the terminal was sent."
             (mega-terminal-probe--problem "the undo tree window stayed")))
         (set-buffer-modified-p nil)
         (kill-buffer "mega-probe-undo"))
-    (error (mega-terminal-probe--problem "the undo tree failed: %S" err))))
+    (error (mega-terminal-probe--problem "the undo tree failed: %S" err)))
+  ;; What an undo did is shown, with the keys a person presses: what it took
+  ;; away is named, what it puts back is marked, and the mark is gone at the
+  ;; next key.
+  (condition-case err
+      (save-window-excursion
+        (delete-other-windows)
+        (switch-to-buffer (get-buffer-create "mega-probe-undone"))
+        (buffer-enable-undo)
+        (dolist (word '("colu" "mn = true"))
+          (undo-boundary)
+          (insert word))
+        (undo-boundary)
+        (let ((marks (lambda ()
+                       (mapcar (lambda (mark)
+                                 (buffer-substring-no-properties
+                                  (overlay-start mark) (overlay-end mark)))
+                               (seq-filter (lambda (overlay)
+                                             (eq (overlay-get overlay 'face)
+                                                 'mega-undo-put-back))
+                                           (overlays-in (point-min) (point-max)))))))
+          (unless (eq (key-binding (kbd "C-_")) 'undo)
+            (mega-terminal-probe--problem "C-_ is %s" (key-binding (kbd "C-_"))))
+          (execute-kbd-macro (kbd "C-_"))
+          ;; Keys that are played back leave the echo area alone, and with
+          ;; it the word Emacs has for what it did; what would be said is
+          ;; kept.
+          (unless (and (equal (buffer-string) "colu")
+                       (member mega-undo-said '("Undo: removed \"mn = true\""
+                                                "Removed \"mn = true\""))
+                       (null (funcall marks)))
+            (mega-terminal-probe--problem
+             "an undo left %S, said %S and marked %S"
+             (buffer-string) mega-undo-said (funcall marks)))
+          ;; Another key, and the same key again: that undoes the undo.
+          (execute-kbd-macro (kbd "C-a"))
+          (execute-kbd-macro (kbd "C-_"))
+          (redisplay t)
+          (unless (and (equal (buffer-string) "column = true")
+                       (member mega-undo-said '("Undo: put back \"mn = true\""
+                                                "Redo: put back \"mn = true\""
+                                                "Put back \"mn = true\""))
+                       (equal (funcall marks) '("mn = true")))
+            (mega-terminal-probe--problem
+             "undoing an undo left %S, said %S and marked %S"
+             (buffer-string) mega-undo-said (funcall marks)))
+          (execute-kbd-macro (kbd "C-a"))
+          (when (funcall marks)
+            (mega-terminal-probe--problem
+             "what an undo put back was still marked after the next key")))
+        (set-buffer-modified-p nil)
+        (kill-buffer "mega-probe-undone"))
+    (error (mega-terminal-probe--problem "showing what an undo did failed: %S" err))))
 
 (defun mega-terminal-probe--blame ()
   "Check, on the live terminal, that a line says who changed it last.
@@ -536,8 +589,11 @@ terminal was sent."
             (redisplay t)
             ;; What that timer does, without waiting for it.
             (mega-blame--idle)
+            ;; Until the answer has been taken, not until git has ended:
+            ;; Emacs knows that a program is gone a moment before it tells
+            ;; whoever waits for it.
             (let ((deadline (+ (float-time) 10)))
-              (while (and (process-live-p mega-blame--process)
+              (while (and mega-blame--process
                           (< (float-time) deadline))
                 (accept-process-output nil 0.1)))
             (redisplay t)

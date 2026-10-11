@@ -290,9 +290,13 @@ Emacs older than 31.1 MEGA configures nothing and says so.
 
 Text that is gone a moment after you typed it has most likely been undone:
 `C-/` takes back one step, and to Emacs a step can end in the middle of a
-word, so what is left does not look like an undo. The echo area says `Undo`
-when that happens. Nothing is lost by it: press any other key and then `C-/`
-again, or look in `C-x u`, where every state the text was in is kept.
+word, so what is left does not look like an undo. MEGA therefore shows what
+an undo did. The echo area names what it took away, `Undo: removed "mn =
+true"`, and text that it puts back is marked where it stands, until the next
+key or for two seconds; the same when you step through `C-x u`. Nothing is
+lost by an undo: press any other key and then `C-/` again, or look in
+`C-x u`, where every state the text was in is kept. `(setq mega-undo-show
+nil)` in `local.el` leaves Emacs's bare `Undo`.
 
 In a terminal, an emoji that is made of several characters is drawn
 plainly: a skull without its colour, a family as three faces side by side, a

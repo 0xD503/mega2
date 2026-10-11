@@ -76,7 +76,9 @@ window, and there is room for a note after every line."
   (forward-line (1- line))
   (run-hooks 'post-command-hook)
   (mega-blame--idle)
-  (mega-test-wait-for (lambda () (not (process-live-p mega-blame--process))) 10)
+  ;; Until the answer has been taken, not until git has ended: Emacs knows
+  ;; that a program is gone a moment before it tells whoever waits for it.
+  (mega-test-wait-for (lambda () (null mega-blame--process)) 10)
   (mega-blame-test--note))
 
 ;;;; Reading what git prints

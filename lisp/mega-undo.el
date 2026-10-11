@@ -388,6 +388,185 @@ history for."
   (mega-after-startup
    (lambda () (run-with-idle-timer 30 nil #'mega-undo-prune))))
 
+;;;; Showing what an undo did
+;;
+;; Emacs says "Undo" in the echo area and no more.  But one step of undo can
+;; take back half a word, and half a word gone does not look like an undo:
+;; it looks like text that was lost.  So what an undo puts back is marked
+;; where it stands, until the next key or for a moment, and what it takes
+;; away is named in the echo area.
+;;
+;; This looks on while Emacs undoes, and changes nothing: not the text, not
+;; the history.  The marks are overlays.  It hears of every change to every
+;; buffer, and for all but those made by an undo that is one test.
+
+(defcustom mega-undo-show t
+  "Non-nil to show what an undo did.
+The text it put back is marked for `mega-undo-show-seconds', and the
+echo area says what it took away."
+  :type 'boolean
+  :group 'mega)
+
+(defcustom mega-undo-show-seconds 2
+  "How long the text an undo put back stays marked when no key is pressed."
+  :type 'number
+  :group 'mega)
+
+(defface mega-undo-put-back '((t :inherit lazy-highlight))
+  "Text that an undo has just put back."
+  :group 'mega)
+
+(defconst mega-undo--show-most 50
+  "The most places one undo marks.  Past that it counts, and marks no more.")
+
+(defconst mega-undo--show-sample 40
+  "How many characters of what an undo did are quoted in the echo area.")
+
+(defvar mega-undo--pending nil
+  "The buffer in which an undo has done something not yet said, or nil.")
+
+(defvar mega-undo--marks nil
+  "The overlays on what the last undo put back.")
+
+(defvar mega-undo--timer nil
+  "The timer that takes `mega-undo--marks' away, or nil.")
+
+(defvar mega-undo--back nil
+  "What the undo in progress put back: (CHARACTERS PLACES . SAMPLE), or nil.")
+
+(defvar mega-undo--gone nil
+  "What the undo in progress took away: (CHARACTERS PLACES . SAMPLE), or nil.")
+
+(defvar mega-undo-said nil
+  "What was last said about an undo, as a string, or nil.")
+
+(defun mega-undo--clear ()
+  "Take away the marks on what an undo put back."
+  (remove-hook 'pre-command-hook #'mega-undo--clear)
+  (when mega-undo--timer
+    (cancel-timer mega-undo--timer)
+    (setq mega-undo--timer nil))
+  (mapc #'delete-overlay mega-undo--marks)
+  (setq mega-undo--marks nil))
+
+(defun mega-undo--count (so-far characters sample)
+  "Add CHARACTERS in one more place to SO-FAR, a (CHARACTERS PLACES . SAMPLE).
+SAMPLE is a function that returns the text; it is asked for the first
+place only."
+  (if so-far
+      (progn (setcar so-far (+ (car so-far) characters))
+             (setcar (cdr so-far) (1+ (cadr so-far)))
+             so-far)
+    (cons characters (cons 1 (funcall sample)))))
+
+(defun mega-undo--removed (length)
+  "The beginning of the LENGTH characters Emacs has just removed, or nil.
+Emacs writes down what it removes, at the front of the undo list, or
+behind what it put in the same place."
+  (let ((records buffer-undo-list) (looked 0) found)
+    (while (and (consp records) (< looked 3) (not found))
+      (let ((text (car-safe (car records))))
+        (when (and (stringp text) (= (length text) length))
+          (setq found (substring-no-properties
+                       text 0 (min length mega-undo--show-sample)))))
+      (setq records (cdr records)
+            looked (1+ looked)))
+    found))
+
+(defun mega-undo--note (start end length)
+  "Note that an undo changed START to END, where LENGTH characters were."
+  (unless mega-undo--pending
+    (mega-undo--clear)
+    (setq mega-undo--pending (current-buffer)
+          mega-undo--back nil
+          mega-undo--gone nil)
+    (add-hook 'post-command-hook #'mega-undo--announce))
+  (when (eq mega-undo--pending (current-buffer))
+    (when (> length 0)
+      ;; Emacs has just written down what it removed.
+      (setq mega-undo--gone
+            (mega-undo--count
+             mega-undo--gone length
+             (lambda () (mega-undo--removed length)))))
+    (when (< start end)
+      (setq mega-undo--back
+            (mega-undo--count
+             mega-undo--back (- end start)
+             (lambda ()
+               (buffer-substring-no-properties
+                start (min end (+ start mega-undo--show-sample))))))
+      (when (< (length mega-undo--marks) mega-undo--show-most)
+        (let ((mark (make-overlay start end nil t)))
+          (overlay-put mark 'face 'mega-undo-put-back)
+          (push mark mega-undo--marks))))))
+
+(defun mega-undo--changed (start end length)
+  "Look on as an undo changes START to END, where LENGTH characters were.
+On `after-change-functions', where it is called for every change there
+is; all but those an undo makes are none of its business.  And nothing
+that goes wrong in here may get out: Emacs empties that hook for
+everybody when a function on it signals."
+  (when (and undo-in-progress mega-undo-show)
+    (condition-case nil
+        (mega-undo--note start end length)
+      (error nil))))
+
+(defun mega-undo--amount (what)
+  "WHAT, a (CHARACTERS PLACES . SAMPLE), in words for the echo area."
+  (let* ((characters (car what))
+         (places (cadr what))
+         (sample (or (cddr what) ""))
+         (whole (and (= places 1) (= characters (length sample))))
+         (quoted (let ((print-escape-newlines t))
+                   (string-replace
+                    "\t" "\\t"
+                    (prin1-to-string (if whole sample (concat sample "…")))))))
+    (if whole
+        quoted
+      (format "%d characters%s (%s)" characters
+              (if (> places 1) (format " in %d places" places) "")
+              quoted))))
+
+(defun mega-undo--word ()
+  "What Emacs has just called its undo: \"Undo\", \"Redo\", or nil.
+With \"in region\" when it said that.  Emacs says it in the echo area
+and nowhere else; an undo made by the tree it calls nothing."
+  (let ((now (current-message)))
+    (and now
+         (string-match "\\`\\(\\(?:Undo\\|Redo\\)\\(?: in region\\)?\\)!?\\'" now)
+         (match-string 1 now))))
+
+(defun mega-undo--said (word)
+  "What to say about the undo just done, which Emacs called WORD, or nil."
+  (let ((parts (delq nil (list (and mega-undo--gone
+                                    (concat "removed "
+                                            (mega-undo--amount mega-undo--gone)))
+                               (and mega-undo--back
+                                    (concat "put back "
+                                            (mega-undo--amount mega-undo--back)))))))
+    (when parts
+      (let ((text (string-join parts ", ")))
+        (if word
+            (concat word ": " text)
+          (concat (upcase (substring text 0 1)) (substring text 1)))))))
+
+(defun mega-undo--announce ()
+  "Say what the undo of the command just run did, and time its marks.
+On `post-command-hook' for the one command that undid something."
+  (remove-hook 'post-command-hook #'mega-undo--announce)
+  (when mega-undo--pending
+    (setq mega-undo--pending nil
+          mega-undo-said (mega-undo--said (mega-undo--word)))
+    ;; A prompt has its own text in the echo area, and it is to stay.
+    (when (and mega-undo-said (not (active-minibuffer-window)))
+      (message "%s" mega-undo-said))
+    (when mega-undo--marks
+      (add-hook 'pre-command-hook #'mega-undo--clear)
+      (setq mega-undo--timer
+            (run-at-time mega-undo-show-seconds nil #'mega-undo--clear)))))
+
+(add-hook 'after-change-functions #'mega-undo--changed)
+
 ;;;; The doctor
 
 
