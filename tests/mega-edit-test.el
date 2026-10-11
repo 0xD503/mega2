@@ -185,6 +185,92 @@
                        (buffer-string))
                      "trimmed\nlast\n")))))
 
+;;;; Tabs or spaces, as the file has them
+
+(defun mega-edit-test--indents-with-tabs-p (directory name &rest lines)
+  "Write LINES to the file NAME in DIRECTORY, open it, and say how it indents.
+The answer is the value of `indent-tabs-mode' in its buffer."
+  (let ((file (apply #'mega-test-write (expand-file-name name directory) lines))
+        (inhibit-message t))
+    (mega-test-visiting buffer file
+      indent-tabs-mode)))
+
+(ert-deftest mega-edit-a-file-indented-with-tabs-gets-tabs ()
+  "Found in the undo history of a real edit: in a .gitconfig, which is
+indented with tabs, a new line began with four spaces."
+  (mega-test-with-directory dir
+    (let ((file (mega-test-write (expand-file-name ".gitconfig" dir)
+                                 "[grep]" "\tlineNumber = true" "\tfullName = true"
+                                 "[pager]" "\tgrep = false" ""))
+          (inhibit-message t))
+      (mega-test-visiting buffer file
+        (should (eq (mega-edit-indented-with) 'tabs))
+        (should indent-tabs-mode)
+        (should (local-variable-p 'indent-tabs-mode))
+        ;; RET at the end of an indented line, and what is typed then begins
+        ;; as its neighbours do.
+        (goto-char (point-min))
+        (forward-line 2)
+        (end-of-line)
+        (let ((last-command-event ?\n))
+          (newline nil t))
+        (insert "column = true")
+        (should (equal (buffer-substring (line-beginning-position) (line-end-position))
+                       "\tcolumn = true"))))
+    ;; Everywhere else MEGA indents with spaces, as it did.
+    (should-not (default-value 'indent-tabs-mode))
+    (should-not (mega-edit-test--indents-with-tabs-p
+                 dir "spaces.conf" "[grep]" "    lineNumber = true" ""))
+    (should-not (mega-edit-test--indents-with-tabs-p
+                 dir "flat.conf" "one = 1" "two = 2" ""))
+    (should-not (mega-edit-test--indents-with-tabs-p dir "empty.conf" ""))))
+
+(ert-deftest mega-edit-how-a-file-is-indented-is-read-from-its-lines ()
+  (cl-flet ((with (&rest lines)
+              (with-temp-buffer
+                (insert (mapconcat #'identity lines "\n") "\n")
+                ;; Wherever the cursor is, and narrowed or not.
+                (goto-char (point-max))
+                (narrow-to-region (point) (point))
+                (prog1 (mega-edit-indented-with)
+                  (should (= (point) (point-max)))
+                  (should (buffer-narrowed-p))))))
+    (should (eq (with "a" "\tb" "\tc" "  d") 'tabs))
+    (should (eq (with "a" "  b" "    c" "\td") 'spaces))
+    (should-not (with "a" "\tb" "  c"))
+    (should-not (with "a" "b"))
+    ;; A tab counts whatever follows it; one space is no indentation, as
+    ;; before the stars of a comment; and a line of blanks says nothing.
+    (should (eq (with "\t  aligned" "/*" " * one" " * two" " */") 'tabs))
+    (should-not (with "\t" "  " " x"))
+    ;; The first lines decide: a long file is not read to its end.
+    (let ((mega-edit--indent-sample 3))
+      (should (eq (with "  a" "  b" "  c" "\td" "\te" "\tf" "\tg") 'spaces)))))
+
+(ert-deftest mega-edit-what-decides-about-tabs-is-asked-before-the-file ()
+  (mega-test-with-directory dir
+    (let ((tabs '("[grep]" "\tone = 1" "\ttwo = 2" "")))
+      ;; A line of the file itself.
+      (should-not (apply #'mega-edit-test--indents-with-tabs-p dir "own.conf"
+                         "# -*- indent-tabs-mode: nil -*-" tabs))
+      ;; A mode that sets it: a Makefile is tabs whatever its lines look like.
+      (should (mega-edit-test--indents-with-tabs-p
+               dir "Makefile" "OBJECTS = a.o \\" "  b.o \\" "  c.o" ""))
+      ;; The setting.
+      (let ((mega-edit-indent-as-the-file nil))
+        (should-not (apply #'mega-edit-test--indents-with-tabs-p dir "off.conf" tabs)))
+      (should (apply #'mega-edit-test--indents-with-tabs-p dir "on.conf" tabs)))
+    ;; The project, when its .editorconfig says how to indent.
+    (let ((project (expand-file-name "project/" dir))
+          (tabs '("[grep]" "\tone = 1" "\ttwo = 2" "")))
+      (make-directory project)
+      (mega-test-write (expand-file-name ".editorconfig" project)
+                       "root = true" "" "[*.conf]" "indent_style = space" ""
+                       "[*.ini]" "trim_trailing_whitespace = true" "")
+      (should-not (apply #'mega-edit-test--indents-with-tabs-p project "a.conf" tabs))
+      ;; And not when it speaks of something else only.
+      (should (apply #'mega-edit-test--indents-with-tabs-p project "a.ini" tabs)))))
+
 (ert-deftest mega-edit-a-markdown-line-break-survives-a-save ()
   "Two spaces at the end of a line are a line break there, not litter."
   (mega-test-with-directory dir

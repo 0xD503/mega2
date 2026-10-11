@@ -161,6 +161,56 @@ removed where `mega-edit-trim-wanted-p' says no."
 (dolist (hook '(prog-mode-hook text-mode-hook conf-mode-hook))
   (add-hook hook #'mega-edit-trim-mode))
 
+;;;; Tabs or spaces, as the file has them
+;;
+;; MEGA indents with spaces unless told otherwise.  In a file whose lines
+;; begin with tabs that puts both kinds into it, a new line with spaces
+;; between lines with tabs, and they look the same on the screen.
+
+(defcustom mega-edit-indent-as-the-file t
+  "Non-nil to indent with tabs in a file that is indented with tabs.
+What decides otherwise is asked first: the project's .editorconfig when
+it says how to indent, a line of the file that sets `indent-tabs-mode',
+and a mode that sets it, as that of a Makefile does."
+  :type 'boolean
+  :group 'mega)
+
+(defconst mega-edit--indent-sample 200
+  "How many indented lines are looked at to see how a file is indented.")
+
+(defun mega-edit-indented-with ()
+  "How the current buffer is indented: `tabs', `spaces', or nil.
+By the first lines that begin with a tab or with two spaces and have
+something after that, `mega-edit--indent-sample' of them at most, in the
+first quarter of a megabyte.  Nil when there are none, or as many of one
+kind as of the other."
+  (save-excursion
+    (save-restriction
+      (widen)
+      (goto-char (point-min))
+      (let ((limit (min (point-max) (+ (point-min) 262144)))
+            (left mega-edit--indent-sample)
+            (tabs 0) (spaces 0))
+        (while (and (> left 0)
+                    (re-search-forward "^\\(?:\\(\t\\)\\|  \\)[ \t]*[^ \t\n]" limit t))
+          (if (match-beginning 1)
+              (setq tabs (1+ tabs))
+            (setq spaces (1+ spaces)))
+          (setq left (1- left)))
+        (cond ((> tabs spaces) 'tabs)
+              ((> spaces tabs) 'spaces))))))
+
+(defun mega-edit--indent-as-the-file ()
+  "Indent with tabs in a file just opened that is indented with tabs.
+Unless something has decided for this buffer already."
+  (when (and mega-edit-indent-as-the-file
+             (not indent-tabs-mode)
+             (not (local-variable-p 'indent-tabs-mode))
+             (eq (mega-edit-indented-with) 'tabs))
+    (setq-local indent-tabs-mode t)))
+
+(add-hook 'find-file-hook #'mega-edit--indent-as-the-file)
+
 ;;;; TODO and friends
 
 (defface mega-edit-todo '((t :inherit warning))

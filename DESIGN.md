@@ -514,6 +514,21 @@ Things learned while building it, worth keeping in mind:
   The stage now also asks that each character of a line is on it. What is
   joined is what takes one cell on both sides, and the rest goes out
   character by character.
+- What a user saw is evidence; what did it is another question. "The
+  blame note appeared and the text I had typed was gone" was first put
+  down to the miscounted cells above, because that could be reproduced and
+  looked the same. The stored undo history of the file said otherwise: the
+  text had been removed by an undo, which Emacs records as one, with the
+  state it led back to; a deletion by anything else carries no such mark.
+  One step of undo had taken the second half of a word, the note came half
+  a second later as it does after any key, and half a word does not look
+  like an undo. The history that survives a restart is also the record of
+  what happened to a text, and is where to look first.
+- A default that suits most files is wrong in the others without a sign.
+  MEGA indents with spaces; in a file indented with tabs that put spaces
+  between tabs, and the two look alike on the screen. The same history
+  shows it: four spaces deleted by hand and typed again. A file's own
+  lines now decide where the project, the file and the mode say nothing.
 - Tests are worth only what they can fail on. Each milestone's safety,
   privacy and security checks were run against deliberately broken copies
   of the code (`MEGA_TEST_CONFIG` points the suite at a copy).

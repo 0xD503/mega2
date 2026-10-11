@@ -250,7 +250,9 @@ downloading parsers, and deleting what MEGA has stored.
 from the examples with `cp local.example.el local.el`. A project's
 `.editorconfig` sets its
 indentation and line endings, moves the ruler (`max_line_length`), and says
-whether spaces at the ends of lines are removed. A module that others are
+whether spaces at the ends of lines are removed. Where it says nothing about
+indentation, MEGA indents with spaces, except in a file whose lines begin
+with tabs: there a new line begins with a tab like its neighbours. A module that others are
 built on (`mega-exec`, `mega-trust`, `mega-project`, `mega-lang`) stays
 loaded for as long as anything that needs it is on the list.
 
@@ -285,6 +287,12 @@ programs it found, and whether the promises above are really in force.
 
 `M-x mega-keys-mode` turns every MEGA key off, leaving stock Emacs. On an
 Emacs older than 31.1 MEGA configures nothing and says so.
+
+Text that is gone a moment after you typed it has most likely been undone:
+`C-/` takes back one step, and to Emacs a step can end in the middle of a
+word, so what is left does not look like an undo. The echo area says `Undo`
+when that happens. Nothing is lost by it: press any other key and then `C-/`
+again, or look in `C-x u`, where every state the text was in is kept.
 
 In a terminal, an emoji that is made of several characters is drawn
 plainly: a skull without its colour, a family as three faces side by side, a
