@@ -5,6 +5,14 @@
 ;; `M-g a' searches the whole project and shows the hits while you type; RET
 ;; jumps to the highlighted one.  `M-g s' starts from the symbol at point.
 ;;
+;; Where it searches is the root of the project, every time.  `C-o d' in the
+;; prompt searches another directory instead, in the project or out of it,
+;; and keeps what is typed and how the search is set; `C-u M-g a' asks for
+;; the directory first.  In that prompt RET goes into a directory, and RET
+;; on ./ at the top of the list, or M-j, searches the one you are in.  The
+;; prompt names the directory: the project's name for its root, the name
+;; and the way down for one in it, the path for one outside it.
+;;
 ;; The search is done by one of three programs, and the prompt says which:
 ;;
 ;;   git      `git grep --perl-regexp --line-number -I': the default.  It
@@ -30,6 +38,7 @@
 ;;   C-o l    take the pattern literally, not as a regular expression
 ;;   C-o w    match whole words only
 ;;   C-o b    switch to the next search program
+;;   C-o d    search another directory, in the project or out of it
 ;;   C-o e    put every hit in a buffer you can navigate and edit
 ;;   C-o ?    list these keys
 ;;
@@ -41,8 +50,9 @@
 ;;   C-g      leave: the windows are as they were, and a file that was
 ;;            opened only to be shown is closed again
 ;;
-;; The settings stay for the session.  To search only part of the project,
-;; add a path or glob after " -- ":   handler -- src/*.rs
+;; The settings stay for the session; the directory does not.  To search
+;; only some of the files, add a path or glob after " -- ":
+;;   handler -- src/*.rs
 ;;
 ;; Which files are searched is the one thing the three programs do not
 ;; agree on, because only git knows what a checkout tracks:
@@ -118,6 +128,9 @@ Git then searches what is tracked and nothing else: it will not do both.")
 (defvar mega-search-history nil "What was searched for.")
 
 (defvar mega-search--directory nil "Where the active search runs.")
+(defvar mega-search--root nil
+  "The root of the project the active search began in.
+What the prompt names the directory by, wherever the search has moved.")
 (defvar mega-search--backend nil "The program the active search uses.")
 (defvar mega-search--left-out nil
   "Directory names the active search passes over, unless it includes ignored files.
@@ -464,6 +477,7 @@ DOC is its docstring."
     ("l" mega-search-toggle-literal "literal")
     ("w" mega-search-toggle-word "words")
     ("b" mega-search-cycle-backend "program")
+    ("d" mega-search-choose-directory "directory")
     ("e" mega-search-export "export"))
   "The keys that follow `C-o' in the search prompt, as (KEY COMMAND WORD).
 WORD is what the key is about, as the prompt itself puts it where it
@@ -622,15 +636,25 @@ and all; a run of signs with no letter or digit in it is no word."
              word)))))
 
 ;;;###autoload
-(defun mega-search-project (&optional initial)
+(defun mega-search-project (&optional initial directory)
   "Search the project as you type, starting from INITIAL.
 Called with its key, it starts from the word or the number the cursor
 is on, and from nothing if the cursor is on neither.  What it starts
-from is selected: type, and what you type takes its place.  See the
-Commentary of mega-search.el for the keys of the prompt."
+from is selected: type, and what you type takes its place.
+
+It searches DIRECTORY, by default the root of the project; with a
+prefix argument, `C-u M-g a', it asks which first.  See the Commentary
+of mega-search.el for the keys of the prompt, `C-o d' among them, which
+moves the search to another directory while it is open."
   (interactive (list (when-let* ((word (mega-search-word-at-point)))
-                       (mega-search-quote word))))
-  (let* ((directory (mega-project-directory))
+                       (mega-search-quote word))
+                     (and current-prefix-arg
+                          (mega-search-read-directory (mega-project-directory)))))
+  (let* ((root (mega-project-directory))
+         (directory (if directory
+                        (file-name-as-directory (expand-file-name directory))
+                      root))
+         (mega-search--root root)
          (mega-search--directory directory)
          (mega-search--backend (mega-search-backend-for directory))
          (mega-search--left-out (mega-project-left-out directory))
@@ -641,6 +665,9 @@ Commentary of mega-search.el for the keys of the prompt."
          (mega-search--windows (current-window-configuration)))
     (unless mega-search--backend
       (user-error "No search program found: install ripgrep, or use this in a git repository"))
+    (when (file-remote-p directory)
+      (user-error "MEGA searches this machine only, and %s is not on it"
+                  (abbreviate-file-name directory)))
     (let ((choice (unwind-protect
                       (mega-pick-read
                        (mega-search-prompt directory mega-search--backend)
@@ -653,29 +680,86 @@ Commentary of mega-search.el for the keys of the prompt."
                     ;; However the prompt was left: by a choice, which is
                     ;; gone to from where the search began, or by C-g.
                     (mega-search--shown-end))))
+      ;; Where the search was when the prompt closed: `C-o d' may have
+      ;; moved it.
       (cond (mega-search--export
-             (mega-search-results-buffer choice directory mega-search--backend))
-            ((mega-search-visit choice directory))
+             (mega-search-results-buffer choice mega-search--directory
+                                         mega-search--backend))
+            ((mega-search-visit choice mega-search--directory))
             (t (message "No hit chosen"))))))
+
+(defun mega-search-place (directory &optional root)
+  "How the prompt names DIRECTORY, in a search that began in project ROOT.
+The project's name for its root, the name and the way down for a
+directory in it, and the path for one outside it.  ROOT defaults to
+DIRECTORY itself."
+  (let* ((directory (file-name-as-directory (expand-file-name directory)))
+         (root (file-name-as-directory (expand-file-name (or root directory))))
+         (name (file-name-nondirectory (directory-file-name root))))
+    ;; By the names alone: the name is for reading, and a directory need
+    ;; not be there to be named.
+    (cond ((equal directory root) name)
+          ((string-prefix-p root directory)
+           (concat name "/" (directory-file-name (substring directory (length root)))))
+          (t (abbreviate-file-name (directory-file-name directory))))))
 
 (defun mega-search-prompt (directory backend)
   "What the prompt says for a search of DIRECTORY with BACKEND.
-Which project, how the search is set at the moment, and where the keys
-are that change it: they mean something only while this prompt is open,
-and there is nowhere else to learn that at the moment it matters."
+Where, how the search is set at the moment, and where the keys are that
+change it: they mean something only while this prompt is open, and
+there is nowhere else to learn that at the moment it matters."
   (format "Search %s [%s] (C-o ? for keys): "
-          (file-name-nondirectory (directory-file-name directory))
+          (mega-search-place directory mega-search--root)
           (let ((mega-search--backend backend))
             (mega-search-describe))))
 
+;;;; Searching somewhere else
+
+(defun mega-search-read-directory (start)
+  "Ask which directory to search, beginning at START, and return it.
+RET goes into a directory, and RET on ./ or M-j takes the one you are
+in.  A directory on another machine is refused: the programs that search
+run on this one."
+  (let* ((enable-recursive-minibuffers t)
+         (directory (file-name-as-directory
+                     (expand-file-name
+                      (read-directory-name "Search in: " start start t)))))
+    (when (file-remote-p directory)
+      (user-error "MEGA searches this machine only, and %s is not on it"
+                  (abbreviate-file-name directory)))
+    directory))
+
+(defun mega-search-choose-directory ()
+  "Search another directory, in the project or out of it.
+What is typed stays, and so does how the search is set; the program is
+the one you would have there, as git grep searches a checkout only.
+The next search begins at the root of the project again."
+  (interactive)
+  (let* ((directory (condition-case err
+                        (mega-search-read-directory mega-search--directory)
+                      (user-error (mega-search--say (error-message-string err))
+                                  nil)))
+         (backend (and directory (mega-search-backend-for directory))))
+    (cond ((null directory))
+          ((null backend)
+           (mega-search--say (format "Nothing here can search %s"
+                                     (abbreviate-file-name directory))))
+          (t
+           (setq mega-search--directory directory
+                 mega-search--backend backend
+                 mega-search--left-out (mega-project-left-out directory))
+           (mega-search--changed)))))
+
 ;;;###autoload
-(defun mega-search-symbol ()
+(defun mega-search-symbol (&optional directory)
   "Search the project for the symbol at point.
 Also when the cursor is right behind it, which `mega-search-project'
-does not take for being on it."
-  (interactive)
+does not take for being on it.  DIRECTORY is where to search, as for
+that command: with a prefix argument it is asked for first."
+  (interactive (list (and current-prefix-arg
+                          (mega-search-read-directory (mega-project-directory)))))
   (let ((symbol (thing-at-point 'symbol t)))
-    (mega-search-project (and symbol (mega-search-quote symbol)))))
+    (mega-search-project (and symbol (mega-search-quote symbol)) directory)))
 
 (provide 'mega-search)
 ;;; mega-search.el ends here

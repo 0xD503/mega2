@@ -539,7 +539,7 @@ And git refuses --recurse-submodules together with --untracked."
       (mega-search-toggle-word) (should mega-search-word))))
 
 (ert-deftest mega-search-every-setting-key-is-bound-after-C-o ()
-  (dolist (key '("c" "u" "i" "s" "h" "l" "w" "b" "e" "?"))
+  (dolist (key '("c" "u" "i" "s" "h" "l" "w" "b" "d" "e" "?"))
     (should (commandp (lookup-key mega-search-map (kbd (concat "C-o " key)))))))
 
 (ert-deftest mega-search-the-prompt-says-how-the-search-is-set ()
@@ -682,7 +682,7 @@ They are in the prompt now, for as long as it is open."
 (ert-deftest mega-search-symbol-quotes-the-symbol ()
   (let (started)
     (cl-letf (((symbol-function 'mega-search-project)
-               (lambda (&optional initial) (setq started initial))))
+               (lambda (&optional initial _directory) (setq started initial))))
       (with-temp-buffer
         (emacs-lisp-mode)
         (insert "foo.bar*")
@@ -693,6 +693,204 @@ They are in the prompt now, for as long as it is open."
         (goto-char (point-max))
         (mega-search-symbol)
         (should (equal started "foo\\.bar\\*"))))))
+
+;;;; Searching another directory
+
+(ert-deftest mega-search-the-prompt-names-where-it-searches ()
+  "The project's name for its root, the way down for a directory in it,
+the path for one outside it."
+  (let ((root "/home/u/src/proj/"))
+    (should (equal (mega-search-place root root) "proj"))
+    (should (equal (mega-search-place "/home/u/src/proj/crates/soc/" root)
+                   "proj/crates/soc"))
+    (should (equal (mega-search-place "/home/u/src/proj/crates/soc" root)
+                   "proj/crates/soc"))
+    (should (equal (mega-search-place "/srv/notes/" root) "/srv/notes"))
+    ;; Beside the project is outside it, whatever the name begins with.
+    (should (equal (mega-search-place "/home/u/src/project-two/" root)
+                   "/home/u/src/project-two"))
+    (should (equal (mega-search-place (expand-file-name "notes/" "~") root)
+                   "~/notes"))
+    ;; Without a project to go by, the directory is its own.
+    (should (equal (mega-search-place "/srv/notes/") "notes"))
+    (mega-search-test--defaults
+      (let ((mega-search--root root))
+        (should (equal (mega-search-prompt "/srv/notes/" 'rg)
+                       "Search /srv/notes [rg  case:smart +hidden] (C-o ? for keys): "))))))
+
+(defmacro mega-search-test--two-places (&rest body)
+  "Run BODY with PROJECT a git repository and ELSEWHERE a directory outside it.
+Each has a file with the word needle in it; ELSEWHERE is no checkout."
+  (declare (indent 0))
+  `(mega-test-with-directory top
+     (let ((project (file-name-as-directory (expand-file-name "proj" top)))
+           (elsewhere (file-name-as-directory (expand-file-name "notes" top))))
+       (mega-test-write (expand-file-name "src/main.rs" project) "fn needle() {}" "")
+       (mega-test-write (expand-file-name "todo.txt" elsewhere) "a needle elsewhere" "")
+       (mega-search-test--git project "init" "--quiet")
+       (mega-search-test--git project "add" "--all")
+       ,@body)))
+
+(ert-deftest mega-search-C-o-d-searches-another-directory-and-keeps-the-rest ()
+  "Asked for after use: a search of a directory chosen while the prompt is open,
+in the project or out of it.  What is typed stays, and so do the settings."
+  (skip-unless (and (executable-find "git") (executable-find "grep")))
+  (mega-search-test--defaults
+    (mega-search-test--two-places
+      (let* ((mega-search-case 'sensitive)
+             (mega-search-word t)
+             (mega-search--root project)
+             (mega-search--directory project)
+             (mega-search--backend 'git)
+             (mega-search--left-out nil)
+             (asked nil) (said nil) (refreshed 0)
+             (answer nil))
+        (cl-letf (((symbol-function 'read-directory-name)
+                   (lambda (prompt start &rest _)
+                     (push (cons prompt start) asked)
+                     answer))
+                  ((symbol-function 'mega-pick-refresh)
+                   (lambda () (setq refreshed (1+ refreshed))))
+                  ((symbol-function 'mega-pick-say)
+                   (lambda (words) (setq said words))))
+          ;; Out of the project, and the way Emacs's prompt gives it back
+          ;; when ./ is taken.
+          (setq answer (concat elsewhere "./"))
+          (mega-search-choose-directory)
+          (should (equal asked `(("Search in: " . ,project))))
+          (should (equal mega-search--directory elsewhere))
+          ;; No checkout there: git grep cannot search it.
+          (should (memq mega-search--backend '(rg grep)))
+          (should (= refreshed 1))
+          (should (string-prefix-p (format "Search %s [%s  case:sensitive"
+                                           (abbreviate-file-name
+                                            (directory-file-name elsewhere))
+                                           mega-search--backend)
+                                   said))
+          (should (string-search " words]" said))
+          ;; The settings are as they were.
+          (should (eq mega-search-case 'sensitive))
+          (should mega-search-word)
+          (should (equal (mega-search-test--files (mega-search-run "needle"))
+                         '("todo.txt")))
+          ;; Back into the project, a directory in it: git grep again, which
+          ;; searches that directory only and names files from there.
+          (setq answer (expand-file-name "src/" project))
+          (mega-search-choose-directory)
+          (should (equal (cdr (car asked)) elsewhere))
+          (should (eq mega-search--backend 'git))
+          (should (string-prefix-p "Search proj/src [git  case:sensitive" said))
+          (should (equal (mega-search-test--files (mega-search-run "needle"))
+                         '("main.rs"))))))))
+
+(ert-deftest mega-search-C-o-d-where-nothing-can-search-says-so ()
+  (mega-search-test--defaults
+    (mega-test-with-directory dir
+      (let* ((dir (file-name-as-directory dir))
+             (mega-search--root dir)
+             (mega-search--directory dir)
+             (mega-search--backend 'git)
+             (notes nil)
+             (answer nil))
+        (cl-letf (((symbol-function 'read-directory-name)
+                   (lambda (&rest _) answer))
+                  ((symbol-function 'mega-pick-refresh) #'ignore)
+                  ((symbol-function 'mega-pick-say) #'ignore)
+                  ((symbol-function 'minibuffer-message)
+                   (lambda (format &rest arguments)
+                     (push (apply #'format format arguments) notes))))
+          ;; On another machine: the programs run on this one.
+          (setq answer "/ssh:somewhere:/srv/")
+          (mega-search-choose-directory)
+          (should (string-search "this machine only" (car notes)))
+          (should (equal mega-search--directory dir))
+          ;; Where no program of the three can search.
+          (setq answer (expand-file-name "sub/" dir))
+          (make-directory answer)
+          (cl-letf (((symbol-function 'mega-exec-find) (lambda (&rest _) nil)))
+            (mega-search-choose-directory))
+          (should (string-search "Nothing here can search" (car notes)))
+          (should (equal mega-search--directory dir))
+          (should (eq mega-search--backend 'git)))))))
+
+(ert-deftest mega-search-C-u-asks-where-and-the-next-search-forgets ()
+  "With a prefix argument the directory is asked for first.  Without, the
+search is of the project's root again: a directory chosen is not kept."
+  (skip-unless (and (executable-find "git") (executable-find "grep")))
+  (mega-search-test--defaults
+    (mega-search-test--two-places
+      (let ((default-directory (expand-file-name "src/" project))
+            (asked nil) (seen nil))
+        (cl-letf (((symbol-function 'read-directory-name)
+                   (lambda (_prompt start &rest _) (push start asked) elsewhere))
+                  ((symbol-function 'mega-pick-read)
+                   (lambda (prompt &rest _)
+                     (push (list prompt mega-search--directory mega-search--backend)
+                           seen)
+                     "")))
+          (let ((current-prefix-arg '(4)))
+            (call-interactively #'mega-search-project))
+          (should (equal asked (list project)))
+          (should (equal (nth 1 (car seen)) elsewhere))
+          (should (string-prefix-p (format "Search %s ["
+                                           (abbreviate-file-name
+                                            (directory-file-name elsewhere)))
+                                   (nth 0 (car seen))))
+          (should (memq (nth 2 (car seen)) '(rg grep)))
+          ;; The next search, unasked: the root, and nothing asked.
+          (call-interactively #'mega-search-project)
+          (should (= (length asked) 1))
+          (should (equal (nth 1 (car seen)) project))
+          (should (string-prefix-p "Search proj [git" (nth 0 (car seen))))
+          ;; The symbol search too.
+          (with-temp-buffer
+            (insert "needle")
+            (goto-char 2)
+            (let ((current-prefix-arg '(4)))
+              (call-interactively #'mega-search-symbol)))
+          (should (= (length asked) 2))
+          (should (equal (nth 1 (car seen)) elsewhere)))))))
+
+(ert-deftest mega-search-a-hit-is-gone-to-where-the-search-found-it ()
+  "After C-o d, RET and the buffer of hits go by the directory searched last.
+And a hit in another project asks nothing about trusting it."
+  (skip-unless (and (executable-find "git") (executable-find "grep")))
+  (should-not (memq 'mega-search-project mega-trust-opening-commands))
+  (should-not (memq 'mega-search-symbol mega-trust-opening-commands))
+  (mega-search-test--defaults
+    (mega-search-test--two-places
+      (let ((default-directory project)
+            (inhibit-message t)
+            (visited nil))
+        (cl-letf (((symbol-function 'read-directory-name)
+                   (lambda (&rest _) elsewhere))
+                  ((symbol-function 'mega-pick-refresh) #'ignore)
+                  ((symbol-function 'mega-pick-say) #'ignore)
+                  ((symbol-function 'mega-pick-read)
+                   (lambda (&rest _)
+                     (mega-search-choose-directory)
+                     (car (mega-search-run "needle")))))
+          (unwind-protect
+              (progn
+                (mega-search-project)
+                (setq visited buffer-file-name)
+                (should (equal visited (expand-file-name "todo.txt" elsewhere)))
+                (should (= (line-number-at-pos) 1)))
+            (when-let* ((buffer (and visited (get-file-buffer visited))))
+              (kill-buffer buffer)))
+          ;; Exported: the buffer of hits is in the directory searched.
+          (cl-letf (((symbol-function 'mega-pick-read)
+                     (lambda (&rest _)
+                       (mega-search-choose-directory)
+                       (mega-search-export)
+                       "needle"))
+                    ((symbol-function 'exit-minibuffer) #'ignore)
+                    ((symbol-function 'pop-to-buffer) #'ignore))
+            (mega-search-project)
+            (with-current-buffer "*mega-search*"
+              (should (equal default-directory elsewhere))
+              (should (string-search "todo.txt:1:" (buffer-string)))
+              (kill-buffer))))))))
 
 (ert-deftest mega-search-quotes-for-the-program-and-not-for-emacs ()
   "A bracket or a bar means something to the program that Emacs would let be."

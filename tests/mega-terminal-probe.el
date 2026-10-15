@@ -141,6 +141,61 @@ minibuffer list on: the keys are simply waiting in the input queue."
                                           (or buffer-file-name (buffer-name))
                                           (line-number-at-pos))))
       (error (mega-terminal-probe--problem "the search failed: %S" err))))
+  ;; Another directory, out of the project: chosen with C-o d while the
+  ;; prompt is open, with what was typed kept, and asked for first with a
+  ;; prefix argument.  The directory prompt is Emacs's own, as a person
+  ;; meets it: the path typed over what it starts with, and M-j to take it.
+  (let* ((top (file-name-as-directory
+               (make-temp-file (expand-file-name "probe-" (getenv "MEGA_TEST_SANDBOX"))
+                               t)))
+         (project (file-name-as-directory (expand-file-name "proj" top)))
+         (other (file-name-as-directory (expand-file-name "notes" top)))
+         (said nil)
+         (say (lambda (words) (push (substring-no-properties words) said)))
+         (default-directory project))
+    (make-directory project t)
+    (make-directory other t)
+    (with-temp-file (expand-file-name "here.txt" project) (insert "the needle is here\n"))
+    (with-temp-file (expand-file-name "there.txt" other) (insert "one\nthe needle is there\n"))
+    (advice-add 'mega-pick-say :before say)
+    (unwind-protect
+        (condition-case err
+            (save-window-excursion
+              (setq unread-command-events
+                    (append (listify-key-sequence (kbd "needle C-o d C-a C-k"))
+                            (string-to-list other)
+                            (listify-key-sequence (kbd "M-j RET"))))
+              (mega-search-project)
+              (setq unread-command-events nil)
+              (unless (and (equal buffer-file-name (expand-file-name "there.txt" other))
+                           (= (line-number-at-pos) 2))
+                (mega-terminal-probe--problem
+                 "after C-o d the search ended in %S, line %s"
+                 (or buffer-file-name (buffer-name)) (line-number-at-pos)))
+              (unless (and said
+                           (string-prefix-p
+                            (format "Search %s [" (abbreviate-file-name
+                                                   (directory-file-name other)))
+                            (car said)))
+                (mega-terminal-probe--problem
+                 "after C-o d the search prompt said %S" (car said)))
+              (kill-buffer)
+              ;; Asked for first, and then a search as any other.
+              (setq unread-command-events
+                    (append (listify-key-sequence (kbd "C-a C-k"))
+                            (string-to-list other)
+                            (listify-key-sequence (kbd "M-j needle RET"))))
+              (let ((current-prefix-arg '(4)))
+                (call-interactively #'mega-search-project))
+              (setq unread-command-events nil)
+              (unless (equal buffer-file-name (expand-file-name "there.txt" other))
+                (mega-terminal-probe--problem
+                 "C-u M-g a searched %S" (or buffer-file-name (buffer-name))))
+              (kill-buffer))
+          (error (mega-terminal-probe--problem "searching another directory failed: %S"
+                                               err)))
+      (setq unread-command-events nil)
+      (advice-remove 'mega-pick-say say)))
   ;; The prompt says how the search is set, and goes on saying so while the
   ;; settings are changed with its keys: here the case, three times, which
   ;; is once round.  What is typed stays as it is, the keys are listed for

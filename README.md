@@ -101,7 +101,7 @@ lists what can follow.
 | `C-c h` | The home page |
 | `C-c y` | Trust this project: let its tools run (see Trust below) |
 | `C-c p f` | Open a file of the project: type any part of its name |
-| `M-g a` | Search the project as you type (`M-g s`: the symbol at point) |
+| `M-g a` | Search the project as you type (`M-g s`: the symbol at point; `C-u` first: a directory you choose) |
 | `C-c t` | Show or hide the file tree |
 | `M-.` | Go to the definition (`M-,` goes back, `M-?` lists the uses) |
 | `C-c d` | Documentation for the thing at point |
@@ -177,6 +177,16 @@ text, `e` exports the hits to an editable buffer. `C-o b` switches to ripgrep, t
 and the session stays with what you chose; `(setq mega-search-backend 'rg)`
 in `local.el` makes ripgrep the one to start with. `needle -- src/*.rs`
 searches part of the project.
+
+A search starts at the root of the project, every time. `C-o d` moves it to
+another directory while the prompt is open, in the project or out of it,
+and keeps what you typed and how the search is set; `C-u M-g a` asks for the
+directory before the prompt opens. In that question RET goes into a
+directory, and RET on `./` at the top, or `M-j`, searches the one you are
+in. The prompt says where it searches: `proj` for the root, `proj/src/net`
+inside it, `~/notes` outside it. The program follows the directory, since
+git grep can only search a checkout. What you open from there is not asked
+about, as nothing a search opens is.
 
 Which files are searched is where the three programs differ, since only git
 knows what a checkout tracks. These too are keys of the search prompt; in

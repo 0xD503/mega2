@@ -52,8 +52,8 @@
      (nil     mega-doctor "What works on this machine, and what is missing")
      ("C-c y" mega-trust-project "Trust this project: let its server, checks, formatter and tasks run"))
     ("Find"
-     ("M-g a" mega-search-project "Search the project as you type")
-     ("M-g s" mega-search-symbol  "Search the project for the symbol at point")
+     ("M-g a" mega-search-project "Search the project as you type; C-u first asks where")
+     ("M-g s" mega-search-symbol  "Search the project for the symbol at point; C-u first asks where")
      ("M-g i" imenu               "Jump to a definition in this buffer")
      ("C-c p" mega-project-map    "Project: f file, p switch, b buffer, g grep, c compile, s shell")
      ("C-c t" mega-project-tree   "Show or hide the file tree"))
@@ -154,6 +154,7 @@ keymap in step.")
      ("C-o l" mega-search-toggle-literal   "Take the pattern literally, or as a regexp")
      ("C-o w" mega-search-toggle-word      "Whole words only, or anywhere")
      ("C-o b" mega-search-cycle-backend    "Switch program: git grep, ripgrep, grep; it stays")
+     ("C-o d" mega-search-choose-directory "Search another directory, in the project or out of it")
      ("C-o e" mega-search-export           "Leave the prompt and put every hit in a buffer")
      ("C-o ?" mega-search-show-keys        "List these keys; how the search is set is in the prompt"))
     ("In the undo tree" mega-undo-tree-mode-map mega-undo-tree
