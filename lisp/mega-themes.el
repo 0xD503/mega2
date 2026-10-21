@@ -9,25 +9,29 @@
 ;; screen comes from a palette, which a test enforces, and a tweak is a
 ;; change to one hex value in one place.
 ;;
-;; The parts, by the names they have in a palette:
+;; The parts, by what they are for:
 ;;
 ;;   bg, bg1, bg2, bg3   the background, and three steps away from it: the
 ;;                       current line, a selection and the modeline, a border
 ;;   comment             text that is there to be skipped
 ;;   fg, fg1, fg2        text, and two steps brighter
-;;   cyan                what you act on: a prompt, a link, a function
-;;   blue, deep          keywords and structure
-;;   teal                types and properties
-;;   green               strings, and what went well
-;;   purple              constants and numbers
-;;   yellow, orange      what wants a look
-;;   red                 what went wrong
+;;   accent              what you act on: a prompt, a link, a function
+;;   keyword, preproc    keywords and operators; what the preprocessor reads
+;;   type                types and properties
+;;   string              strings, and what went well
+;;   constant            constants and numbers
+;;   warning, notice     what wants a look: a warning, a match; a mark of
+;;                       unsaved changes, a character that is not what it seems
+;;   error               what went wrong
 ;;
-;; The faces apply on displays with at least 256 colours; Emacs approximates
-;; the hex values there, and they are exact with 24-bit colour.  On anything
-;; poorer a theme stays out of the way and the terminal's own colours show.
+;; The faces apply in a theme's own colours on displays with at least 256
+;; colours; Emacs approximates the hex values there, and they are exact with
+;; 24-bit colour.  On a terminal of 8 or 16 colours every theme looks the
+;; same, as `mega-themes-ansi-palette' has it: the terminal's own eight
+;; colours, by name.  With fewer, nothing is applied and the terminal's own
+;; colours show.
 ;;
-;; To add a theme: a file NAME-theme.el beside this one, like the two that
+;; To add a theme: a file NAME-theme.el beside this one, like the ones that
 ;; are there, and its name in `mega-themes' in mega-ui.el.  This file is
 ;; named in the plural so that Emacs does not take it for a theme itself.
 
@@ -35,213 +39,250 @@
 
 (defconst mega-themes-parts
   '(bg bg1 bg2 bg3 comment fg fg1 fg2
-    teal cyan blue deep red orange yellow green purple)
+    accent keyword preproc type string constant warning notice error)
   "The parts a palette gives a colour to.")
+
+(defun mega-themes--faces (palette)
+  "The faces MEGA's themes colour, as (FACE . ATTRIBUTES), from PALETTE."
+  (let-alist palette
+    (list
+
+     ;; Basics
+     `(default             :foreground ,.fg :background ,.bg)
+     `(cursor              :background ,.fg)
+     `(region              :background ,.bg2 :extend t)
+     `(secondary-selection :background ,.bg1 :extend t)
+     `(highlight           :background ,.bg2)
+     `(hl-line             :background ,.bg1 :extend t)
+     `(shadow              :foreground ,.comment)
+     `(minibuffer-prompt   :foreground ,.accent :weight bold)
+     `(link                :foreground ,.accent :underline t)
+     `(link-visited        :foreground ,.constant :underline t)
+     `(button              :foreground ,.accent :underline t)
+     `(error               :foreground ,.error :weight bold)
+     `(warning             :foreground ,.warning :weight bold)
+     `(success             :foreground ,.string :weight bold)
+     `(match               :foreground ,.warning :weight bold)
+     `(escape-glyph        :foreground ,.notice)
+     `(homoglyph           :foreground ,.notice)
+     `(nobreak-space       :foreground ,.notice :underline t)
+     `(trailing-whitespace :background ,.error)
+     `(help-key-binding    :foreground ,.accent :background ,.bg1)
+     `(tooltip             :foreground ,.fg :background ,.bg1)
+     `(child-frame-border  :background ,.bg3)
+     `(internal-border     :background ,.bg3)
+
+     ;; Window furniture
+     `(mode-line            :foreground ,.fg2 :background ,.bg2 :box nil)
+     `(mode-line-active     :foreground ,.fg2 :background ,.bg2 :box nil)
+     `(mode-line-inactive   :foreground ,.comment :background ,.bg1 :box nil)
+     `(mode-line-buffer-id  :foreground ,.accent :weight bold)
+     `(mode-line-emphasis   :foreground ,.fg2 :weight bold)
+     `(mode-line-highlight  :background ,.bg3)
+     `(header-line          :foreground ,.fg2 :background ,.bg1)
+     `(vertical-border      :foreground ,.bg2)
+     `(fringe               :foreground ,.comment)
+     `(line-number          :foreground ,.bg3)
+     `(line-number-current-line :foreground ,.accent :weight bold)
+     `(fill-column-indicator :foreground ,.bg2)
+     `(tab-bar              :foreground ,.comment :background ,.bg1)
+     `(tab-bar-tab          :foreground ,.fg2 :background ,.bg2 :weight bold)
+     `(tab-bar-tab-inactive :foreground ,.comment :background ,.bg1)
+     `(tab-line             :foreground ,.comment :background ,.bg1)
+     `(tty-menu-enabled-face  :foreground ,.fg :background ,.bg1)
+     `(tty-menu-disabled-face :foreground ,.comment :background ,.bg1)
+     `(tty-menu-selected-face :foreground ,.fg2 :background ,.bg3)
+
+     ;; Search
+     `(isearch        :foreground ,.bg :background ,.accent)
+     `(isearch-fail   :foreground ,.fg2 :background ,.error)
+     `(lazy-highlight :foreground ,.fg2 :background ,.bg3)
+     `(query-replace  :foreground ,.bg :background ,.warning)
+
+     ;; Parentheses
+     `(show-paren-match    :foreground ,.fg2 :background ,.bg3 :weight bold)
+     `(show-paren-mismatch :foreground ,.fg2 :background ,.error)
+
+     ;; Code
+     `(font-lock-comment-face           :foreground ,.comment)
+     `(font-lock-comment-delimiter-face :foreground ,.comment)
+     `(font-lock-doc-face               :foreground ,.comment)
+     `(font-lock-doc-markup-face        :foreground ,.keyword)
+     `(font-lock-string-face            :foreground ,.string)
+     `(font-lock-escape-face            :foreground ,.warning)
+     `(font-lock-regexp-face            :foreground ,.warning)
+     `(font-lock-regexp-grouping-backslash :foreground ,.warning)
+     `(font-lock-regexp-grouping-construct :foreground ,.warning)
+     `(font-lock-keyword-face           :foreground ,.keyword)
+     `(font-lock-builtin-face           :foreground ,.keyword)
+     `(font-lock-preprocessor-face      :foreground ,.preproc)
+     `(font-lock-function-name-face     :foreground ,.accent)
+     `(font-lock-function-call-face     :foreground ,.accent)
+     `(font-lock-variable-name-face     :foreground ,.fg)
+     `(font-lock-variable-use-face      :foreground ,.fg)
+     `(font-lock-property-name-face     :foreground ,.type)
+     `(font-lock-property-use-face      :foreground ,.type)
+     `(font-lock-type-face              :foreground ,.type)
+     `(font-lock-constant-face          :foreground ,.constant)
+     `(font-lock-number-face            :foreground ,.constant)
+     `(font-lock-operator-face          :foreground ,.keyword)
+     `(font-lock-negation-char-face     :foreground ,.keyword)
+     `(font-lock-punctuation-face       :foreground ,.fg2)
+     `(font-lock-bracket-face           :foreground ,.fg2)
+     `(font-lock-delimiter-face         :foreground ,.fg2)
+     `(font-lock-misc-punctuation-face  :foreground ,.fg2)
+     `(font-lock-warning-face           :foreground ,.warning :weight bold)
+     `(eldoc-highlight-function-argument :foreground ,.warning :weight bold)
+
+     ;; Completion
+     `(completions-common-part      :foreground ,.accent :weight bold)
+     `(completions-first-difference :foreground ,.warning)
+     `(completions-annotations      :foreground ,.comment)
+     `(completions-highlight        :background ,.bg2 :extend t)
+     `(completions-group-title      :foreground ,.keyword :weight bold)
+     `(icomplete-first-match        :foreground ,.string :weight bold)
+     `(icomplete-selected-match     :background ,.bg2 :extend t)
+     `(completion-preview           :foreground ,.comment)
+     `(completion-preview-exact     :foreground ,.comment :underline t)
+     `(which-key-key-face                 :foreground ,.accent)
+     `(which-key-separator-face           :foreground ,.comment)
+     `(which-key-command-description-face :foreground ,.fg)
+     `(which-key-group-description-face   :foreground ,.keyword)
+     `(which-key-local-map-description-face :foreground ,.type)
+
+     ;; Diagnostics and the language server
+     `(flymake-error   :underline (:style wave :color ,.error))
+     `(flymake-warning :underline (:style wave :color ,.warning))
+     `(flymake-note    :underline (:style wave :color ,.string))
+     `(eglot-highlight-symbol-face :background ,.bg2)
+     `(eglot-inlay-hint-face       :foreground ,.comment)
+     `(eglot-mode-line             :foreground ,.type)
+
+     ;; Building, searching, comparing
+     `(compilation-error       :foreground ,.error :weight bold)
+     `(compilation-warning     :foreground ,.warning)
+     `(compilation-info        :foreground ,.string)
+     `(compilation-line-number :foreground ,.constant)
+     `(compilation-column-number :foreground ,.constant)
+     `(compilation-mode-line-exit :foreground ,.string :weight bold)
+     `(compilation-mode-line-fail :foreground ,.error :weight bold)
+     `(compilation-mode-line-run  :foreground ,.warning)
+     `(xref-file-header :foreground ,.accent :weight bold)
+     `(xref-line-number :foreground ,.comment)
+     `(xref-match       :foreground ,.warning :weight bold)
+     `(diff-header         :foreground ,.keyword)
+     `(diff-file-header    :foreground ,.accent :weight bold)
+     `(diff-hunk-header    :foreground ,.constant)
+     `(diff-added          :foreground ,.string)
+     `(diff-removed        :foreground ,.error)
+     `(diff-changed        :foreground ,.warning)
+     `(diff-indicator-added   :foreground ,.string)
+     `(diff-indicator-removed :foreground ,.error)
+     `(diff-indicator-changed :foreground ,.warning)
+     `(diff-refine-added   :foreground ,.string :background ,.bg2 :weight bold)
+     `(diff-refine-removed :foreground ,.error :background ,.bg2 :weight bold)
+     `(diff-refine-changed :foreground ,.warning :background ,.bg2 :weight bold)
+     `(vc-edited-state        :foreground ,.warning)
+     `(vc-up-to-date-state    :foreground ,.string)
+     `(vc-locally-added-state :foreground ,.string)
+     `(vc-conflict-state      :foreground ,.error :weight bold)
+     `(vc-removed-state       :foreground ,.error)
+     `(vc-missing-state       :foreground ,.error)
+
+     ;; Files
+     `(dired-directory :foreground ,.keyword :weight bold)
+     `(dired-header    :foreground ,.accent :weight bold)
+     `(dired-symlink   :foreground ,.type)
+     `(dired-marked    :foreground ,.warning :weight bold)
+     `(dired-flagged   :foreground ,.error :weight bold)
+     `(dired-ignored   :foreground ,.comment)
+     `(dired-broken-symlink :foreground ,.error :underline t)
+     `(speedbar-directory-face :foreground ,.keyword)
+     `(speedbar-file-face      :foreground ,.fg)
+     `(speedbar-selected-face  :foreground ,.accent :weight bold)
+     `(speedbar-highlight-face :background ,.bg2)
+     `(speedbar-button-face    :foreground ,.comment)
+     `(speedbar-tag-face       :foreground ,.type)
+
+     ;; Structure
+     `(outline-1 :foreground ,.accent :weight bold)
+     `(outline-2 :foreground ,.keyword :weight bold)
+     `(outline-3 :foreground ,.type :weight bold)
+     `(outline-4 :foreground ,.string)
+     `(outline-5 :foreground ,.warning)
+     `(outline-6 :foreground ,.notice)
+     `(outline-7 :foreground ,.constant)
+     `(outline-8 :foreground ,.preproc)
+
+     ;; Terminals, shells and coloured program output
+     `(ansi-color-black          :foreground ,.bg1 :background ,.bg1)
+     `(ansi-color-red            :foreground ,.error :background ,.error)
+     `(ansi-color-green          :foreground ,.string :background ,.string)
+     `(ansi-color-yellow         :foreground ,.warning :background ,.warning)
+     `(ansi-color-blue           :foreground ,.keyword :background ,.keyword)
+     `(ansi-color-magenta        :foreground ,.constant :background ,.constant)
+     `(ansi-color-cyan           :foreground ,.accent :background ,.accent)
+     `(ansi-color-white          :foreground ,.fg1 :background ,.fg1)
+     `(ansi-color-bright-black   :foreground ,.bg3 :background ,.bg3)
+     `(ansi-color-bright-red     :foreground ,.error :background ,.error)
+     `(ansi-color-bright-green   :foreground ,.string :background ,.string)
+     `(ansi-color-bright-yellow  :foreground ,.warning :background ,.warning)
+     `(ansi-color-bright-blue    :foreground ,.keyword :background ,.keyword)
+     `(ansi-color-bright-magenta :foreground ,.constant :background ,.constant)
+     `(ansi-color-bright-cyan    :foreground ,.type :background ,.type)
+     `(ansi-color-bright-white   :foreground ,.fg2 :background ,.fg2)
+     `(comint-highlight-prompt   :foreground ,.accent :weight bold)
+     `(eshell-prompt             :foreground ,.accent :weight bold)
+
+     ;; MEGA's own
+     `(mega-modeline-modified  :foreground ,.notice)
+     `(mega-modeline-read-only :foreground ,.comment)
+     `(mega-modeline-remote    :foreground ,.warning)
+     `(mega-modeline-vc        :foreground ,.constant))))
+
+(defconst mega-themes-display '((class color) (min-colors 256))
+  "The displays a theme's own palette is for.")
+
+(defconst mega-themes-few-colours '((class color) (min-colors 8))
+  "The displays below that, which get `mega-themes-ansi-palette' instead.
+A terminal of 8 or 16 colours.  Fewer than 8, and no theme is applied:
+the terminal's own colours show.")
+
+(defconst mega-themes-ansi-palette
+  '((bg . "black") (bg1 . "black") (bg2 . "blue") (bg3 . "blue")
+    (comment . "blue")
+    (fg . "white") (fg1 . "white") (fg2 . "white")
+    (accent . "yellow") (keyword . "cyan") (preproc . "cyan") (type . "magenta")
+    (string . "green") (constant . "magenta")
+    (warning . "yellow") (notice . "yellow") (error . "red"))
+  "What every theme looks like on a terminal of fewer than 256 colours.
+The eight colours every colour terminal has, by their names, so that the
+terminal draws them in its own shades: white on black, keywords cyan,
+functions and the prompt yellow, strings green, types and constants
+magenta, comments and what is selected blue, errors red.  Eight colours
+cannot tell seventeen parts apart; the current line, for one, is not
+marked.")
+
+(defun mega-themes--check (theme palette)
+  "Signal an error unless PALETTE has every part of a theme, and no other.
+THEME is what it is for, to name in the error."
+  (unless (equal (sort (mapcar #'car palette) #'string<)
+                 (sort (copy-sequence mega-themes-parts) #'string<))
+    (error "The palette of %s is not the parts of a MEGA theme" theme)))
 
 (defun mega-themes-set (theme palette)
   "Give the faces MEGA uses their colours in THEME, from PALETTE.
 PALETTE is an alist of (PART . COLOUR) with every one of
-`mega-themes-parts' in it and nothing else."
-  (unless (equal (sort (mapcar #'car palette) #'string<)
-                 (sort (copy-sequence mega-themes-parts) #'string<))
-    (error "The palette of %s is not the parts of a MEGA theme" theme))
-  (let ((c '((class color) (min-colors 256))))
-    (let-alist palette
-      (custom-theme-set-faces
-       theme
-
-       ;; Basics
-       `(default             ((,c (:foreground ,.fg :background ,.bg))))
-       `(cursor              ((,c (:background ,.fg))))
-       `(region              ((,c (:background ,.bg2 :extend t))))
-       `(secondary-selection ((,c (:background ,.bg1 :extend t))))
-       `(highlight           ((,c (:background ,.bg2))))
-       `(hl-line             ((,c (:background ,.bg1 :extend t))))
-       `(shadow              ((,c (:foreground ,.comment))))
-       `(minibuffer-prompt   ((,c (:foreground ,.cyan :weight bold))))
-       `(link                ((,c (:foreground ,.cyan :underline t))))
-       `(link-visited        ((,c (:foreground ,.purple :underline t))))
-       `(button              ((,c (:foreground ,.cyan :underline t))))
-       `(error               ((,c (:foreground ,.red :weight bold))))
-       `(warning             ((,c (:foreground ,.yellow :weight bold))))
-       `(success             ((,c (:foreground ,.green :weight bold))))
-       `(match               ((,c (:foreground ,.yellow :weight bold))))
-       `(escape-glyph        ((,c (:foreground ,.orange))))
-       `(homoglyph           ((,c (:foreground ,.orange))))
-       `(nobreak-space       ((,c (:foreground ,.orange :underline t))))
-       `(trailing-whitespace ((,c (:background ,.red))))
-       `(help-key-binding    ((,c (:foreground ,.cyan :background ,.bg1))))
-       `(tooltip             ((,c (:foreground ,.fg :background ,.bg1))))
-       `(child-frame-border  ((,c (:background ,.bg3))))
-       `(internal-border     ((,c (:background ,.bg3))))
-
-       ;; Window furniture
-       `(mode-line            ((,c (:foreground ,.fg2 :background ,.bg2 :box nil))))
-       `(mode-line-active     ((,c (:foreground ,.fg2 :background ,.bg2 :box nil))))
-       `(mode-line-inactive   ((,c (:foreground ,.comment :background ,.bg1 :box nil))))
-       `(mode-line-buffer-id  ((,c (:foreground ,.cyan :weight bold))))
-       `(mode-line-emphasis   ((,c (:foreground ,.fg2 :weight bold))))
-       `(mode-line-highlight  ((,c (:background ,.bg3))))
-       `(header-line          ((,c (:foreground ,.fg2 :background ,.bg1))))
-       `(vertical-border      ((,c (:foreground ,.bg2))))
-       `(fringe               ((,c (:foreground ,.comment))))
-       `(line-number          ((,c (:foreground ,.bg3))))
-       `(line-number-current-line ((,c (:foreground ,.cyan :weight bold))))
-       `(fill-column-indicator ((,c (:foreground ,.bg2))))
-       `(tab-bar              ((,c (:foreground ,.comment :background ,.bg1))))
-       `(tab-bar-tab          ((,c (:foreground ,.fg2 :background ,.bg2 :weight bold))))
-       `(tab-bar-tab-inactive ((,c (:foreground ,.comment :background ,.bg1))))
-       `(tab-line             ((,c (:foreground ,.comment :background ,.bg1))))
-       `(tty-menu-enabled-face  ((,c (:foreground ,.fg :background ,.bg1))))
-       `(tty-menu-disabled-face ((,c (:foreground ,.comment :background ,.bg1))))
-       `(tty-menu-selected-face ((,c (:foreground ,.fg2 :background ,.bg3))))
-
-       ;; Search
-       `(isearch        ((,c (:foreground ,.bg :background ,.cyan))))
-       `(isearch-fail   ((,c (:foreground ,.fg2 :background ,.red))))
-       `(lazy-highlight ((,c (:foreground ,.fg2 :background ,.bg3))))
-       `(query-replace  ((,c (:foreground ,.bg :background ,.yellow))))
-
-       ;; Parentheses
-       `(show-paren-match    ((,c (:foreground ,.fg2 :background ,.bg3 :weight bold))))
-       `(show-paren-mismatch ((,c (:foreground ,.fg2 :background ,.red))))
-
-       ;; Code
-       `(font-lock-comment-face           ((,c (:foreground ,.comment))))
-       `(font-lock-comment-delimiter-face ((,c (:foreground ,.comment))))
-       `(font-lock-doc-face               ((,c (:foreground ,.comment))))
-       `(font-lock-doc-markup-face        ((,c (:foreground ,.blue))))
-       `(font-lock-string-face            ((,c (:foreground ,.green))))
-       `(font-lock-escape-face            ((,c (:foreground ,.yellow))))
-       `(font-lock-regexp-face            ((,c (:foreground ,.yellow))))
-       `(font-lock-regexp-grouping-backslash ((,c (:foreground ,.yellow))))
-       `(font-lock-regexp-grouping-construct ((,c (:foreground ,.yellow))))
-       `(font-lock-keyword-face           ((,c (:foreground ,.blue))))
-       `(font-lock-builtin-face           ((,c (:foreground ,.blue))))
-       `(font-lock-preprocessor-face      ((,c (:foreground ,.deep))))
-       `(font-lock-function-name-face     ((,c (:foreground ,.cyan))))
-       `(font-lock-function-call-face     ((,c (:foreground ,.cyan))))
-       `(font-lock-variable-name-face     ((,c (:foreground ,.fg))))
-       `(font-lock-variable-use-face      ((,c (:foreground ,.fg))))
-       `(font-lock-property-name-face     ((,c (:foreground ,.teal))))
-       `(font-lock-property-use-face      ((,c (:foreground ,.teal))))
-       `(font-lock-type-face              ((,c (:foreground ,.teal))))
-       `(font-lock-constant-face          ((,c (:foreground ,.purple))))
-       `(font-lock-number-face            ((,c (:foreground ,.purple))))
-       `(font-lock-operator-face          ((,c (:foreground ,.blue))))
-       `(font-lock-negation-char-face     ((,c (:foreground ,.blue))))
-       `(font-lock-punctuation-face       ((,c (:foreground ,.fg2))))
-       `(font-lock-bracket-face           ((,c (:foreground ,.fg2))))
-       `(font-lock-delimiter-face         ((,c (:foreground ,.fg2))))
-       `(font-lock-misc-punctuation-face  ((,c (:foreground ,.fg2))))
-       `(font-lock-warning-face           ((,c (:foreground ,.yellow :weight bold))))
-       `(eldoc-highlight-function-argument ((,c (:foreground ,.yellow :weight bold))))
-
-       ;; Completion
-       `(completions-common-part      ((,c (:foreground ,.cyan :weight bold))))
-       `(completions-first-difference ((,c (:foreground ,.yellow))))
-       `(completions-annotations      ((,c (:foreground ,.comment))))
-       `(completions-highlight        ((,c (:background ,.bg2 :extend t))))
-       `(completions-group-title      ((,c (:foreground ,.blue :weight bold))))
-       `(icomplete-first-match        ((,c (:foreground ,.green :weight bold))))
-       `(icomplete-selected-match     ((,c (:background ,.bg2 :extend t))))
-       `(completion-preview           ((,c (:foreground ,.comment))))
-       `(completion-preview-exact     ((,c (:foreground ,.comment :underline t))))
-       `(which-key-key-face                 ((,c (:foreground ,.cyan))))
-       `(which-key-separator-face           ((,c (:foreground ,.comment))))
-       `(which-key-command-description-face ((,c (:foreground ,.fg))))
-       `(which-key-group-description-face   ((,c (:foreground ,.blue))))
-       `(which-key-local-map-description-face ((,c (:foreground ,.teal))))
-
-       ;; Diagnostics and the language server
-       `(flymake-error   ((,c (:underline (:style wave :color ,.red)))))
-       `(flymake-warning ((,c (:underline (:style wave :color ,.yellow)))))
-       `(flymake-note    ((,c (:underline (:style wave :color ,.green)))))
-       `(eglot-highlight-symbol-face ((,c (:background ,.bg2))))
-       `(eglot-inlay-hint-face       ((,c (:foreground ,.comment))))
-       `(eglot-mode-line             ((,c (:foreground ,.teal))))
-
-       ;; Building, searching, comparing
-       `(compilation-error       ((,c (:foreground ,.red :weight bold))))
-       `(compilation-warning     ((,c (:foreground ,.yellow))))
-       `(compilation-info        ((,c (:foreground ,.green))))
-       `(compilation-line-number ((,c (:foreground ,.purple))))
-       `(compilation-column-number ((,c (:foreground ,.purple))))
-       `(compilation-mode-line-exit ((,c (:foreground ,.green :weight bold))))
-       `(compilation-mode-line-fail ((,c (:foreground ,.red :weight bold))))
-       `(compilation-mode-line-run  ((,c (:foreground ,.yellow))))
-       `(xref-file-header ((,c (:foreground ,.cyan :weight bold))))
-       `(xref-line-number ((,c (:foreground ,.comment))))
-       `(xref-match       ((,c (:foreground ,.yellow :weight bold))))
-       `(diff-header         ((,c (:foreground ,.blue))))
-       `(diff-file-header    ((,c (:foreground ,.cyan :weight bold))))
-       `(diff-hunk-header    ((,c (:foreground ,.purple))))
-       `(diff-added          ((,c (:foreground ,.green))))
-       `(diff-removed        ((,c (:foreground ,.red))))
-       `(diff-changed        ((,c (:foreground ,.yellow))))
-       `(diff-indicator-added   ((,c (:foreground ,.green))))
-       `(diff-indicator-removed ((,c (:foreground ,.red))))
-       `(diff-indicator-changed ((,c (:foreground ,.yellow))))
-       `(diff-refine-added   ((,c (:foreground ,.green :background ,.bg2 :weight bold))))
-       `(diff-refine-removed ((,c (:foreground ,.red :background ,.bg2 :weight bold))))
-       `(diff-refine-changed ((,c (:foreground ,.yellow :background ,.bg2 :weight bold))))
-       `(vc-edited-state        ((,c (:foreground ,.yellow))))
-       `(vc-up-to-date-state    ((,c (:foreground ,.green))))
-       `(vc-locally-added-state ((,c (:foreground ,.green))))
-       `(vc-conflict-state      ((,c (:foreground ,.red :weight bold))))
-       `(vc-removed-state       ((,c (:foreground ,.red))))
-       `(vc-missing-state       ((,c (:foreground ,.red))))
-
-       ;; Files
-       `(dired-directory ((,c (:foreground ,.blue :weight bold))))
-       `(dired-header    ((,c (:foreground ,.cyan :weight bold))))
-       `(dired-symlink   ((,c (:foreground ,.teal))))
-       `(dired-marked    ((,c (:foreground ,.yellow :weight bold))))
-       `(dired-flagged   ((,c (:foreground ,.red :weight bold))))
-       `(dired-ignored   ((,c (:foreground ,.comment))))
-       `(dired-broken-symlink ((,c (:foreground ,.red :underline t))))
-       `(speedbar-directory-face ((,c (:foreground ,.blue))))
-       `(speedbar-file-face      ((,c (:foreground ,.fg))))
-       `(speedbar-selected-face  ((,c (:foreground ,.cyan :weight bold))))
-       `(speedbar-highlight-face ((,c (:background ,.bg2))))
-       `(speedbar-button-face    ((,c (:foreground ,.comment))))
-       `(speedbar-tag-face       ((,c (:foreground ,.teal))))
-
-       ;; Structure
-       `(outline-1 ((,c (:foreground ,.cyan :weight bold))))
-       `(outline-2 ((,c (:foreground ,.blue :weight bold))))
-       `(outline-3 ((,c (:foreground ,.teal :weight bold))))
-       `(outline-4 ((,c (:foreground ,.green))))
-       `(outline-5 ((,c (:foreground ,.yellow))))
-       `(outline-6 ((,c (:foreground ,.orange))))
-       `(outline-7 ((,c (:foreground ,.purple))))
-       `(outline-8 ((,c (:foreground ,.deep))))
-
-       ;; Terminals, shells and coloured program output
-       `(ansi-color-black          ((,c (:foreground ,.bg1 :background ,.bg1))))
-       `(ansi-color-red            ((,c (:foreground ,.red :background ,.red))))
-       `(ansi-color-green          ((,c (:foreground ,.green :background ,.green))))
-       `(ansi-color-yellow         ((,c (:foreground ,.yellow :background ,.yellow))))
-       `(ansi-color-blue           ((,c (:foreground ,.blue :background ,.blue))))
-       `(ansi-color-magenta        ((,c (:foreground ,.purple :background ,.purple))))
-       `(ansi-color-cyan           ((,c (:foreground ,.cyan :background ,.cyan))))
-       `(ansi-color-white          ((,c (:foreground ,.fg1 :background ,.fg1))))
-       `(ansi-color-bright-black   ((,c (:foreground ,.bg3 :background ,.bg3))))
-       `(ansi-color-bright-red     ((,c (:foreground ,.red :background ,.red))))
-       `(ansi-color-bright-green   ((,c (:foreground ,.green :background ,.green))))
-       `(ansi-color-bright-yellow  ((,c (:foreground ,.yellow :background ,.yellow))))
-       `(ansi-color-bright-blue    ((,c (:foreground ,.blue :background ,.blue))))
-       `(ansi-color-bright-magenta ((,c (:foreground ,.purple :background ,.purple))))
-       `(ansi-color-bright-cyan    ((,c (:foreground ,.teal :background ,.teal))))
-       `(ansi-color-bright-white   ((,c (:foreground ,.fg2 :background ,.fg2))))
-       `(comint-highlight-prompt   ((,c (:foreground ,.cyan :weight bold))))
-       `(eshell-prompt             ((,c (:foreground ,.cyan :weight bold))))
-
-       ;; MEGA's own
-       `(mega-modeline-modified  ((,c (:foreground ,.orange))))
-       `(mega-modeline-read-only ((,c (:foreground ,.comment))))
-       `(mega-modeline-remote    ((,c (:foreground ,.yellow))))
-       `(mega-modeline-vc        ((,c (:foreground ,.purple))))))))
+`mega-themes-parts' in it and nothing else.  On a display with fewer
+than 256 colours the face is as `mega-themes-ansi-palette' has it."
+  (mega-themes--check theme palette)
+  (apply #'custom-theme-set-faces theme
+         (seq-mapn (lambda (full few)
+                     (list (car full)
+                           (list (list mega-themes-display (cdr full))
+                                 (list mega-themes-few-colours (cdr few)))))
+                   (mega-themes--faces palette)
+                   (mega-themes--faces mega-themes-ansi-palette))))
 
 (provide 'mega-themes)
 ;;; mega-themes.el ends here

@@ -24,9 +24,9 @@
   '((bg . "#2E3440") (bg1 . "#3B4252") (bg2 . "#434C5E") (bg3 . "#4C566A")
     (comment . "#616E88")
     (fg . "#D8DEE9") (fg1 . "#E5E9F0") (fg2 . "#ECEFF4")
-    (teal . "#8FBCBB") (cyan . "#88C0D0") (blue . "#81A1C1") (deep . "#5E81AC")
-    (red . "#BF616A") (orange . "#D08770") (yellow . "#EBCB8B")
-    (green . "#A3BE8C") (purple . "#B48EAD"))
+    (type . "#8FBCBB") (accent . "#88C0D0") (keyword . "#81A1C1") (preproc . "#5E81AC")
+    (error . "#BF616A") (notice . "#D08770") (warning . "#EBCB8B")
+    (string . "#A3BE8C") (constant . "#B48EAD"))
   "The Nord palette.  The only place a colour of this theme is written down.")
 
 (mega-themes-set 'mega-nord mega-nord-palette)

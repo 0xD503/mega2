@@ -266,7 +266,7 @@ downloading parsers, and deleting what MEGA has stored.
 | Want to… | Edit |
 | --- | --- |
 | Change something on this machine only | `local.el` |
-| Change the theme | `(setq mega-theme 'mega-nord)` in `local.el`; `M-x mega-theme` for this session only |
+| Change the theme | `(setq mega-theme 'mega-nord)` or `'mega-ayu` in `local.el`; `M-x mega-theme` for this session only |
 | Add, move or remove a key | `mega-keys-add` / `mega-keys-remove`, in `local.el`; the cheat sheet follows |
 | Change a global default | `lisp/mega-core.el` |
 | Add a language: modes, server, formatter, indentation | one row of `mega-languages` in `lisp/mega-lang.el` |
@@ -277,13 +277,20 @@ downloading parsers, and deleting what MEGA has stored.
 `local.el` is yours: git ignores it, so an update never touches it. Start
 from the examples with `cp local.example.el local.el`.
 
-There are two themes. `mega-hacker`, the one MEGA starts with, is green on
+There are three themes. `mega-hacker`, the one MEGA starts with, is green on
 black, after the old screens: a background that is all but black, text in
 the green of phosphor, and what stands out from it bright. `mega-nord` is
-the Nord palette, soft and blue-grey. A theme is a palette of seventeen colours in
-`lisp/NAME-theme.el`; which face gets which of them is written once, in
-`lisp/mega-themes.el`, so a colour is changed in one place and a theme of
-your own is one short file and its name in `mega-themes`. A project's
+the Nord palette, soft and blue-grey. `mega-ayu` is Ayu Dark, as Zed has
+it: blue-black, keywords orange, functions yellow. They need a terminal of
+256 colours or more. On one of 8 or 16, whichever is chosen, MEGA uses the
+eight colours every terminal has, by name, so that the terminal draws them
+in its own shades: white on black, keywords cyan, functions yellow, strings
+green, comments and what is selected blue.
+
+A theme is a palette of seventeen colours in `lisp/NAME-theme.el`, each
+named for what it is used for; which face gets which of them is written
+once, in `lisp/mega-themes.el`, so a colour is changed in one place and a
+theme of your own is one short file and its name in `mega-themes`. A project's
 `.editorconfig` sets its
 indentation and line endings, moves the ruler (`max_line_length`), and says
 whether spaces at the ends of lines are removed. Where it says nothing about

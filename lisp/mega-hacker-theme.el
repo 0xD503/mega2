@@ -22,9 +22,9 @@
   '((bg . "#0A0F0C") (bg1 . "#15231B") (bg2 . "#1F3327") (bg3 . "#2C4435")
     (comment . "#668A71")
     (fg . "#A6E3B4") (fg1 . "#C6F2CF") (fg2 . "#E4FFEA")
-    (teal . "#35D6A8") (cyan . "#4FE3F2") (blue . "#5DB2FF") (deep . "#3A8FC4")
-    (red . "#EE3F55") (orange . "#FF9E42") (yellow . "#FFD34E")
-    (green . "#4DFF88") (purple . "#D391FF"))
+    (type . "#35D6A8") (accent . "#4FE3F2") (keyword . "#5DB2FF") (preproc . "#3A8FC4")
+    (error . "#EE3F55") (notice . "#FF9E42") (warning . "#FFD34E")
+    (string . "#4DFF88") (constant . "#D391FF"))
   "The palette.  The only place a colour of this theme is written down.")
 
 (mega-themes-set 'mega-hacker mega-hacker-palette)

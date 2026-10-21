@@ -788,43 +788,48 @@ copy as native code.  Anything else: from source."
           (mega-terminal-probe--problem "strings are %s"
                                         (face-attribute 'font-lock-string-face
                                                         :foreground))))
-    ;; Too few colours to approximate the palette: the theme must stay out of
-    ;; the way and leave the terminal's own colours alone.
-    (when (equal (face-attribute 'default :background) "#0A0F0C")
-      (mega-terminal-probe--problem "the theme was applied with only %s colours"
-                                    (display-color-cells))))
-  ;; The other theme, switched to as `M-x mega-theme' does it, and back:
-  ;; its colours reach the screen where there are colours enough, and
-  ;; nothing of the first is left under them.
+    ;; Too few colours for the palette: the eight every terminal has, by
+    ;; name, so that it draws them in its own shades.
+    (unless (and (equal (face-attribute 'default :background) "black")
+                 (equal (face-attribute 'default :foreground) "white")
+                 (equal (face-attribute 'font-lock-string-face :foreground) "green")
+                 (equal (face-attribute 'region :background) "blue"))
+      (mega-terminal-probe--problem
+       "with %s colours the theme gives %s on %s, strings %s, a selection on %s"
+       (display-color-cells)
+       (face-attribute 'default :foreground) (face-attribute 'default :background)
+       (face-attribute 'font-lock-string-face :foreground)
+       (face-attribute 'region :background))))
+  ;; Every theme, switched to as `M-x mega-theme' does it, and back to the
+  ;; first: its colours reach the screen where there are colours enough,
+  ;; nothing of the one before is left under them, and with few colours
+  ;; they all look the same.
+  (defvar mega-themes)
   (condition-case err
       (progn
-        (mega-theme 'mega-nord)
-        (redisplay t)
-        (unless (equal custom-enabled-themes '(mega-nord))
-          (mega-terminal-probe--problem "after switching, the themes are %S"
-                                        custom-enabled-themes))
-        (if (>= (display-color-cells) 256)
-            (unless (and (equal (face-attribute 'default :background) "#2E3440")
-                         (equal (face-attribute 'default :foreground) "#D8DEE9")
-                         (equal (face-attribute 'font-lock-string-face :foreground)
-                                "#A3BE8C"))
-              (mega-terminal-probe--problem
-               "the other theme gives %s on %s, strings %s"
-               (face-attribute 'default :foreground)
-               (face-attribute 'default :background)
-               (face-attribute 'font-lock-string-face :foreground)))
-          (when (equal (face-attribute 'default :background) "#2E3440")
-            (mega-terminal-probe--problem
-             "the other theme was applied with only %s colours"
-             (display-color-cells))))
-        (mega-theme 'mega-hacker)
-        (redisplay t)
-        (unless (and (equal custom-enabled-themes '(mega-hacker))
-                     (or (< (display-color-cells) 256)
-                         (equal (face-attribute 'default :background) "#0A0F0C")))
-          (mega-terminal-probe--problem "switching back left %S on %s"
-                                        custom-enabled-themes
-                                        (face-attribute 'default :background))))
+        (dolist (theme (append (cdr mega-themes) (list (car mega-themes))))
+          (mega-theme theme)
+          (redisplay t)
+          (let ((palette (symbol-value (intern (format "%s-palette" theme)))))
+            (unless (equal custom-enabled-themes (list theme))
+              (mega-terminal-probe--problem "after switching to %s, the themes are %S"
+                                            theme custom-enabled-themes))
+            (pcase-let ((`(,foreground ,background ,strings)
+                         (if (>= (display-color-cells) 256)
+                             (list (alist-get 'fg palette) (alist-get 'bg palette)
+                                   (alist-get 'string palette))
+                           (list "white" "black" "green"))))
+              (unless (and (equal (face-attribute 'default :foreground) foreground)
+                           (equal (face-attribute 'default :background) background)
+                           (equal (face-attribute 'font-lock-string-face :foreground)
+                                  strings))
+                (mega-terminal-probe--problem
+                 "%s gives %s on %s, strings %s, where it is %s on %s, strings %s"
+                 theme
+                 (face-attribute 'default :foreground)
+                 (face-attribute 'default :background)
+                 (face-attribute 'font-lock-string-face :foreground)
+                 foreground background strings))))))
     (error (mega-terminal-probe--problem "switching the theme failed: %S" err)))
   (unless (eql (frame-parameter nil 'menu-bar-lines) 0)
     (mega-terminal-probe--problem "the menu bar is showing"))

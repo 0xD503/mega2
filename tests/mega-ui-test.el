@@ -22,6 +22,22 @@ A theme that is not on is read, and not switched on."
   (mega-ui-test--theme-faces theme)
   (symbol-value (intern (format "%s-palette" theme))))
 
+(defun mega-ui-test--clauses (theme display)
+  "Alist of (FACE . ATTRIBUTES): what THEME gives each face on DISPLAY.
+DISPLAY is one of the display conditions in mega-themes.el."
+  (mapcar (lambda (face) (cons (car face) (cadr (assoc display (cdr face)))))
+          (mega-ui-test--theme-faces theme)))
+
+(defconst mega-ui-test--eight
+  '("black" "red" "green" "yellow" "blue" "magenta" "cyan" "white")
+  "The colours every colour terminal has, by the names Emacs knows them by.")
+
+(defun mega-ui-test--strings (form)
+  "Every string that appears anywhere in FORM."
+  (cond ((stringp form) (list form))
+        ((consp form) (append (mega-ui-test--strings (car form))
+                              (mega-ui-test--strings (cdr form))))))
+
 (defun mega-ui-test--colours (form)
   "Every colour string that appears anywhere in FORM."
   (cond ((stringp form) (and (string-prefix-p "#" form) (list form)))
@@ -53,7 +69,7 @@ go by: 4.5 is enough for text, 3 for large or bold text."
   (should (eq mega-theme 'mega-hacker))
   (should (equal custom-enabled-themes '(mega-hacker)))
   ;; The one MEGA starts with unasked is the first.
-  (should (equal mega-themes '(mega-hacker mega-nord)))
+  (should (equal mega-themes '(mega-hacker mega-nord mega-ayu)))
   (should (eq (default-toplevel-value 'mega-theme) (car mega-themes)))
   ;; Each has its file, and the file that they share is not taken for one.
   (dolist (theme mega-themes)
@@ -78,15 +94,27 @@ go by: 4.5 is enough for text, 3 for large or bold text."
 (ert-deftest mega-ui-every-theme-colour-comes-from-the-palette ()
   (dolist (theme mega-themes)
     (let ((palette (mapcar #'cdr (mega-ui-test--palette theme)))
-          (used (mega-ui-test--colours (mega-ui-test--theme-faces theme))))
+          (used (mega-ui-test--colours
+                 (mega-ui-test--clauses theme mega-themes-display)))
+          (few (mega-ui-test--strings
+                (mega-ui-test--clauses theme mega-themes-few-colours))))
       (should (> (length used) 100))
       (dolist (colour used)
         (should (member colour palette)))
       ;; And no colour of a palette is there for nothing.
       (dolist (colour palette)
-        (should (member colour used))))))
+        (should (member colour used)))
+      ;; With few colours, the eight by name and nothing else.
+      (should (> (length few) 100))
+      (dolist (colour few)
+        (should (member colour mega-ui-test--eight))))))
 
 (ert-deftest mega-ui-the-palette-is-valid-and-unambiguous ()
+  ;; The one for few colours: every part, each one of the eight.
+  (should (equal (sort (mapcar #'car mega-themes-ansi-palette) #'string<)
+                 (sort (copy-sequence mega-themes-parts) #'string<)))
+  (dolist (entry mega-themes-ansi-palette)
+    (should (member (cdr entry) mega-ui-test--eight)))
   (dolist (theme mega-themes)
     (let ((palette (mega-ui-test--palette theme)))
       (dolist (entry palette)
@@ -108,12 +136,15 @@ go by: 4.5 is enough for text, 3 for large or bold text."
                                     ((consp form) (cons (named (car form))
                                                         (named (cdr form))))
                                     (t form))))
-                  (sort (named (mega-ui-test--theme-faces theme))
+                  (sort (named (mega-ui-test--clauses theme mega-themes-display))
                         (lambda (one other)
                           (string< (car one) (car other))))))))
-    (let ((first (parts (car mega-themes))))
+    (let ((first (parts (car mega-themes)))
+          (few (mega-ui-test--clauses (car mega-themes) mega-themes-few-colours)))
       (dolist (theme (cdr mega-themes))
-        (should (equal (parts theme) first)))))
+        (should (equal (parts theme) first))
+        ;; With few colours they are one and the same.
+        (should (equal (mega-ui-test--clauses theme mega-themes-few-colours) few)))))
   ;; A palette that is short of a part, or has one too many, is refused.
   (should-error (mega-themes-set 'mega-nord '((bg . "#000000"))))
   (should-error (mega-themes-set 'mega-nord
@@ -123,11 +154,11 @@ go by: 4.5 is enough for text, 3 for large or bold text."
   "By measure: how far each colour of text is from what it is written on."
   (dolist (theme mega-themes)
     (let-alist (mega-ui-test--palette theme)
-      ;; Nord is what it is, a palette others drew, soft on purpose; a
-      ;; theme of MEGA's own has to make the mark for text.
-      (let ((enough (if (eq theme 'mega-nord) 3.0 4.5)))
-        (dolist (text (list .fg .fg1 .fg2 .teal .cyan .blue .deep .red
-                            .orange .yellow .green .purple))
+      ;; Nord and Ayu are what they are, palettes others drew, Nord soft on
+      ;; purpose; a theme of MEGA's own has to make the mark for text.
+      (let ((enough (if (memq theme '(mega-nord mega-ayu)) 3.0 4.5)))
+        (dolist (text (list .fg .fg1 .fg2 .type .accent .keyword .preproc .error
+                            .notice .warning .string .constant))
           (should (>= (mega-ui-test--contrast text .bg) enough)))
         ;; Text on the current line, in a selection and in the modeline.
         (dolist (ground (list .bg1 .bg2))
@@ -135,9 +166,9 @@ go by: 4.5 is enough for text, 3 for large or bold text."
       ;; What is there to be skipped can still be read; what marks a place
       ;; (a search, a mismatch) is written dark on bright or bright on red.
       (should (>= (mega-ui-test--contrast .comment .bg) 2.4))
-      (should (>= (mega-ui-test--contrast .bg .cyan) 4.5))
-      (should (>= (mega-ui-test--contrast .bg .yellow) 4.5))
-      (should (>= (mega-ui-test--contrast .fg2 .red) 3))
+      (should (>= (mega-ui-test--contrast .bg .accent) 4.5))
+      (should (>= (mega-ui-test--contrast .bg .warning) 4.5))
+      (should (>= (mega-ui-test--contrast .fg2 .error) 3))
       (should (>= (mega-ui-test--contrast .fg2 .bg3) 4.5))
       ;; The steps of the background can be told apart, and stay background.
       (should (< 1.1 (mega-ui-test--contrast .bg1 .bg)
@@ -176,12 +207,27 @@ go by: 4.5 is enough for text, 3 for large or bold text."
     (mega-theme 'mega-hacker))
   (should (equal custom-enabled-themes '(mega-hacker))))
 
-(ert-deftest mega-ui-the-theme-keeps-out-of-poor-terminals ()
-  "Every face is conditional on 256 colours, so 16-colour terminals keep theirs."
+(ert-deftest mega-ui-a-terminal-of-few-colours-gets-eight ()
+  "Asked for after use: a theme for a terminal of 8 or 16 colours.
+Every face is in a theme's own colours from 256 up, in the eight by name
+from 8 up, and not at all below: a terminal of two keeps its own."
+  (should (equal mega-themes-display '((class color) (min-colors 256))))
+  (should (equal mega-themes-few-colours '((class color) (min-colors 8))))
   (dolist (theme mega-themes)
     (dolist (face (mega-ui-test--theme-faces theme))
-      (dolist (clause (cdr face))
-        (should (equal (car clause) '((class color) (min-colors 256))))))))
+      (should (equal (mapcar #'car (cdr face))
+                     (list mega-themes-display mega-themes-few-colours)))))
+  ;; What that looks like, for the faces that make it readable.
+  (let ((few (mega-ui-test--clauses 'mega-hacker mega-themes-few-colours)))
+    (should (equal (cdr (assq 'default few)) '(:foreground "white" :background "black")))
+    (should (equal (plist-get (cdr (assq 'font-lock-string-face few)) :foreground) "green"))
+    (should (equal (plist-get (cdr (assq 'font-lock-keyword-face few)) :foreground) "cyan"))
+    (should (equal (plist-get (cdr (assq 'error few)) :foreground) "red"))
+    ;; What is selected stands out: from the text, and from where it is.
+    (should (equal (plist-get (cdr (assq 'region few)) :background) "blue"))
+    (should (equal (plist-get (cdr (assq 'icomplete-selected-match few)) :background)
+                   "blue"))
+    (should (equal (plist-get (cdr (assq 'mode-line few)) :background) "blue"))))
 
 (ert-deftest mega-ui-every-themed-mega-face-is-defined ()
   (dolist (face (mapcar #'car (mega-ui-test--theme-faces)))
