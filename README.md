@@ -53,6 +53,8 @@ trusted projects, workspaces) lives elsewhere and is read with care: a file
 a newer MEGA cannot make sense of is ignored, never guessed at, so the worst
 an update can do is make MEGA ask or forget something once. Its compiled
 copy is rebuilt by itself.
+What each version brought is in [NEWS.md](NEWS.md); `M-x mega-doctor` names
+the one running.
 
 To remove it, delete `~/.mega2.d`. What MEGA remembers is in
 `~/.local/state/mega2`, and what it built, with its backups of your files,

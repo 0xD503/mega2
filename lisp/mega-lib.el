@@ -24,8 +24,11 @@
 
 ;;; Code:
 
-(defconst mega-version "2.0.0-m6"
-  "The MEGA version.  The suffix names the last finished milestone.")
+(defconst mega-version "2.1.0"
+  "The MEGA version: MAJOR.MINOR.PATCH.
+MINOR goes up with a round of work that adds or changes what MEGA does,
+PATCH with one that only mends; MAJOR stays 2 until MEGA is made over
+again.  What each version brought is in NEWS.md.")
 
 (defgroup mega nil
   "MEGA: a self-sufficient, terminal-first Emacs configuration.

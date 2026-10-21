@@ -1,0 +1,55 @@
+# What changed in MEGA
+
+One entry per version, newest first. A version is MAJOR.MINOR.PATCH: MINOR
+goes up with a round of work that adds or changes what MEGA does, PATCH with
+one that only mends, and MAJOR stays 2 until MEGA is made over again. Each
+version is tagged in git as `vX.Y.Z`.
+
+## 2.1.0 — 2026-10-21
+
+The first rounds of use.
+
+**Search**
+- Each hit shows what matched, marked.
+- `M-g a` starts from the word or number under the cursor, selected:
+  typing replaces it.
+- `C-j` shows a hit where you searched from and keeps the prompt open;
+  `C-v` and `M-v` page through the list.
+- The prompt says how the search is set, and says the new setting at once
+  when a `C-o` key changes it; `C-o ?` lists the keys.
+- `C-o d` searches another directory, in the project or out of it;
+  `C-u M-g a` asks for it first.
+- Files git does not track are left out unless asked for.
+
+**Editing**
+- The line the cursor rests on says who changed it last, and when.
+- Once the line that opens a block is out of sight, it is shown above the
+  text.
+- A file indented with tabs is indented with tabs.
+- What an undo took away is named, and what it put back is marked.
+
+**Looks**
+- Three themes: Ayu Dark, which MEGA starts with, green on black, and Nord.
+- A terminal of 8 or 16 colours gets one look in its own eight colours.
+- Emoji and other joined characters no longer throw a terminal's lines out
+  of place.
+
+**Projects**
+- Trust, and running in the dev container, are asked about once, when you
+  open a project yourself, with a typed yes.
+- A dev container starts without a window, unless it fails.
+- `fd` lists a project's files where it is installed; the home page's
+  choices are picked with `C-n` and `C-p`.
+- A yes to a parser builds it, and the question does not come back.
+
+**MEGA itself**
+- `local.el.example` holds every setting, with what it does and its value.
+- MEGA runs on an Emacs without native compilation, as bytecode.
+- Making the compiled copy again keeps the native code of what did not
+  change; the doctor says which functions are never native, and why.
+- `Q` leaves the undo tree too.
+
+## 2.0.0 — 2026-10-10
+
+The first whole MEGA: everything in DESIGN.md's milestones M0 to M6, the
+compiled copy, and a repository of its own (commit 084b491).

@@ -359,5 +359,27 @@ current during startup, so the setting silently does nothing elsewhere."
                            (cdr case))
                    nil t)))))))
 
+;;;; The version
+
+(ert-deftest mega-lib-the-version-is-the-newest-in-the-news ()
+  "As the user set it: MAJOR.MINOR.PATCH, MAJOR 2, and each version in NEWS.md.
+The newest entry there is the version MEGA says it is, so that a version
+is never raised without saying what it brought, nor written down without
+being raised."
+  (should (string-match-p "\\`2\\.[0-9]+\\.[0-9]+\\'" mega-version))
+  (with-temp-buffer
+    (insert-file-contents (expand-file-name "../NEWS.md" mega-test-dir))
+    (goto-char (point-min))
+    (let (versions)
+      (while (re-search-forward "^## \\([0-9]+\\.[0-9]+\\.[0-9]+\\) — \\([0-9-]+\\)$" nil t)
+        (push (match-string 1) versions))
+      (setq versions (nreverse versions))
+      (should (equal (car versions) mega-version))
+      ;; Newest first, each once.
+      (should (equal versions (delete-dups (copy-sequence versions))))
+      (should (equal versions
+                     (sort (copy-sequence versions)
+                           (lambda (one other) (version< other one))))))))
+
 (provide 'mega-lib-test)
 ;;; mega-lib-test.el ends here

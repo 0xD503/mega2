@@ -360,6 +360,17 @@ its top is what Emacs is pointed at.
 
 Each milestone ends with its unit tests, doctor rows and guide entries.
 
+## Versions
+
+MAJOR.MINOR.PATCH, in `mega-version` (lisp/mega-lib.el), as the user set
+it on 2026-10-21: MINOR goes up with a round of work that adds or changes
+what MEGA does, PATCH with one that only mends, and MAJOR stays 2 until the
+user decides MEGA is to be made over again. Each version has an entry in
+NEWS.md, written for whoever uses MEGA, and a tag `vX.Y.Z`; a test holds
+NEWS.md's newest entry to `mega-version`. 2.0.0 is commit 084b491, the
+milestones done and the repository of its own; 2.1.0 the first rounds of
+use.
+
 ## Testing
 
 `tests/run.sh` runs five stages in a sandbox, without the network,
