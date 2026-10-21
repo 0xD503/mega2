@@ -1,4 +1,4 @@
-;;; local.example.el --- Machine-specific MEGA settings  -*- lexical-binding: t; -*-
+;;; local.example.el --- Every MEGA setting, to start local.el from  -*- lexical-binding: t; -*-
 
 ;;; Commentary:
 
@@ -6,28 +6,446 @@
 ;; alone should have.  Git ignores local.el, so an update of MEGA never
 ;; touches it, and one machine's settings never travel to another.
 ;;
-;; It loads BEFORE the modules, because its main job is choosing.  Anything
-;; that has to run after a module has loaded goes in `with-eval-after-load',
-;; which works regardless of ordering.
+;;   cp local.example.el local.el
 ;;
-;; Examples — all commented out:
+;; Below is every setting MEGA has, by subject: what it does, and the value
+;; it has while nothing is said about it.  At the end are recipes for what
+;; is not a setting of MEGA's.  All of it is commented out.  To change
+;; something, take the ";; " away from the lines that set it, all of them
+;; when there are several (select them and press C-c C-c), and change the
+;; value.  A setting left commented out keeps MEGA's value, which an update
+;; may change; one you uncomment keeps yours.
 ;;
-;;   ;; A different line-length limit, and so a different ruler, by default.
-;;   ;; A project's .editorconfig still overrides it.
-;;   (setq-default fill-column 100)
+;; local.el loads BEFORE the modules, because its main job is choosing:
+;; what a module reads as it loads must be set by then, and a plain `setq'
+;; does that.  What has to happen after a module has loaded, such as a
+;; change to one of Emacs's own defaults that MEGA sets, goes in
+;; `with-eval-after-load', as the recipes do.
 ;;
-;;   ;; No ruler in prose.
-;;   (with-eval-after-load 'mega-ui
-;;     (remove-hook 'text-mode-hook #'mega-ui-ruler))
-;;
-;;   ;; Nord instead of green on black.  `M-x mega-theme' tries one out.
-;;   (setq mega-theme 'mega-nord)
-;;
-;;   ;; One more kind of file MEGA must not remember.
-;;   (add-to-list 'mega-private-file-regexps "/vault/")
+;; A test holds this file to MEGA: every setting is here, under its name and
+;; with the value it has; and all of it, every line uncommented, loads
+;; without an error and does what each recipe says.
 
 ;;; Code:
 
+;;;; Looks
 
+;; The theme MEGA starts with: one of `mega-themes'.  Set it in local.el.
+;; `M-x mega-theme' changes the theme of a session.
+;; One of: mega-hacker, mega-nord, mega-ayu.
+;; (setq mega-theme 'mega-hacker)
+
+;; Non-nil to use the mouse in a terminal.  With it on, the terminal's own
+;; text selection needs Shift held down.  Under tmux the mouse reaches Emacs
+;; only if tmux has `mouse on'.
+;; (setq mega-mouse t)
+
+;; The character a guide is drawn with.  `|' is used instead on a terminal
+;; that cannot display it.
+;; (setq mega-indent-guides-character ?│)
+
+;;;; Starting Emacs, and the home page
+
+;; Whether Emacs opens on the home page when it is given no file.
+;; (setq mega-home-at-startup t)
+
+;; How many recent projects the home page lists, at most 9.
+;; (setq mega-home-projects 9)
+
+;;;; Editing
+
+;; Non-nil to indent with tabs in a file that is indented with tabs.  What
+;; decides otherwise is asked first: the project's .editorconfig when it says
+;; how to indent, a line of the file that sets `indent-tabs-mode', and a mode
+;; that sets it, as that of a Makefile does.
+;; (setq mega-edit-indent-as-the-file t)
+
+;; Modes in which trailing whitespace is left alone on save.  In Markdown two
+;; spaces at the end of a line are a line break, and in a diff they are part
+;; of what is being compared.  A project's .editorconfig, when it says
+;; anything about it, decides instead.
+;; (setq mega-edit-trim-except-modes
+;;       '(mega-markdown-mode
+;;         markdown-mode
+;;         markdown-ts-mode
+;;         diff-mode))
+
+;; Columns per level of nesting in MEGA's own language modes.  A project's
+;; .editorconfig overrides it, as it does for every mode.
+;; (setq mega-simple-indent-offset 4)
+
+;; Whether code shows, above the text, the lines that open the blocks around
+;; the cursor once they are out of sight.  Nil switches that off everywhere;
+;; `M-x mega-context-mode' still turns it on in one buffer.
+;; (setq mega-context t)
+
+;; How many lines above the cursor are looked at, at most, for what opens a
+;; block.  What opens a block further up than that is not shown.
+;; (setq mega-context-scan-lines 2000)
+
+;;;; Who changed a line
+
+;; Whether a file that git keeps shows who changed the current line last.  Nil
+;; switches that off everywhere; `M-x mega-blame-mode' still turns it on in
+;; one buffer.
+;; (setq mega-blame t)
+
+;; Whose name and time a line is shown with.  `author' is who wrote the
+;; change; `committer' is who put it into the history, which is somebody else
+;; after a rebase or when a maintainer applied it.
+;; One of: author, committer.
+;; (setq mega-blame-who 'author)
+
+;; Seconds Emacs has to be idle before git is asked about the current line.
+;; (setq mega-blame-delay 0.5)
+
+;; Seconds after which a question to git about one line is given up.
+;; (setq mega-blame-timeout 5)
+
+;; The largest unsaved buffer, in characters, that git is given to read.
+;; (setq mega-blame-max-size 2000000)
+
+;;;; Undo
+
+;; Non-nil to show what an undo did.  The text it put back is marked for
+;; `mega-undo-show-seconds', and the echo area says what it took away.
+;; (setq mega-undo-show t)
+
+;; How long the text an undo put back stays marked when no key is pressed.
+;; (setq mega-undo-show-seconds 2)
+
+;; Non-nil to keep the undo history of files between sessions.
+;; (setq mega-undo-persist t)
+
+;; How much undo history to keep for one file, in characters.  The newest
+;; changes are kept, the oldest dropped.
+;; (setq mega-undo-persist-limit (* 512 1024))
+
+;; A stored history not used for this many days is deleted; nil keeps all.
+;; (setq mega-undo-keep-days 90)
+
+;; No undo history is kept for a file with more characters than this.  Every
+;; save of a file with a history hashes its whole text.
+;; (setq mega-undo-max-file-size (* 4 1024 1024))
+
+;; No undo history is kept for a file whose name matches one of these.  This
+;; is in addition to the files `mega-forgettable-file-p' recognises: private
+;; ones, temporary ones, commit messages.
+;; (setq mega-undo-exclude-regexps nil)
+
+;; The tree window is never taller than this many lines.
+;; (setq mega-undo-tree-max-height 10)
+
+;;;; Completion and documentation
+
+;; Seconds to pause after a keystroke before the menu appears.
+;; (setq mega-complete-delay 0.15)
+
+;; Fewest characters to type before the menu appears on its own.
+;; (setq mega-complete-min-prefix 2)
+
+;; Most candidates the menu shows at once.
+;; (setq mega-complete-max-lines 10)
+
+;; Most candidates the menu keeps; a longer list is cut.
+;; (setq mega-complete-max-candidates 200)
+
+;; Most lines the documentation popup shows.
+;; (setq mega-doc-popup-max-lines 16)
+
+;; Widest the documentation popup gets, in columns.
+;; (setq mega-doc-popup-max-width 80)
+
+;;;; Formatting on save
+
+;; Whether saving a file formats it first.  Set it to nil in a buffer, or in
+;; local.el, to save without formatting.
+;; (setq mega-format-on-save t)
+
+;; Seconds a formatter may take before MEGA gives up on it.
+;; (setq mega-format-timeout 5)
+
+;; Largest buffer, in characters, that is formatted on save.
+;; (setq mega-format-max-size (* 1024 1024))
+
+;;;; Search
+
+;; The program that searches the project: `git', `rg' or `grep'.  Where it
+;; cannot be used, the next of those three that can is: `git grep' searches a
+;; checkout and nothing else, and a program may not be installed.  `C-o b' in
+;; the search prompt changes this for the session; set it in local.el to
+;; change it for good.  (`auto', an older value, means `git'.)
+;; One of: git, rg, grep.
+;; (setq mega-search-backend 'git)
+
+;; Fewest characters to type before a search runs.
+;; (setq mega-search-min-input 2)
+
+;; Most hits a search collects before it stops the program.
+;; (setq mega-search-max-results 500)
+
+;; How case is treated: `smart', `ignore' or `sensitive'.  `smart' means case
+;; matters only if the pattern contains a capital.
+;; (setq mega-search-case 'smart)
+
+;; Non-nil to include files git does not track.  Off to begin with, as plain
+;; `git grep' has it: a search of a checkout is a search of what the checkout
+;; holds.
+;; (setq mega-search-untracked nil)
+
+;; Non-nil to include files that are ignored.
+;; (setq mega-search-ignored nil)
+
+;; Non-nil to search the submodules of a checkout as well, with `git grep'.
+;; Git then searches what is tracked and nothing else: it will not do both.
+;; (setq mega-search-submodules nil)
+
+;; Non-nil to include hidden files.
+;; (setq mega-search-hidden t)
+
+;; Non-nil to take the pattern literally.
+;; (setq mega-search-literal nil)
+
+;; Non-nil to match whole words only.
+;; (setq mega-search-word nil)
+
+;;;; Projects
+
+;; Files that mark the root of a project that is not under version control.
+;; By default, the kinds of project marked :root in `mega-project-kinds'.  The
+;; nearest directory at or above a file that holds one of these is the root.
+;; Version control is asked first, so inside a checkout these mean nothing: a
+;; crate of a workspace stays part of the workspace's project.  Keep to names
+;; that are found only at a root; a Makefile is not one.
+;; (setq mega-project-markers
+;;       '("Cargo.toml"
+;;         "go.mod"
+;;         "build.zig"
+;;         "CMakeLists.txt"
+;;         "pyproject.toml"
+;;         "package.json"
+;;         ".devcontainer"))
+
+;; Directories that hold no files of a project without version control.  They
+;; are where a build puts its results: thousands of files nobody opens by name
+;; or searches.  In a checkout this list means nothing, since the checkout's
+;; own ignore rules say it better.  `C-u C-c p f' offers the files in them all
+;; the same.
+;; (setq mega-project-ignored-directories
+;;       '("target"
+;;         "node_modules"
+;;         ".zig-cache"
+;;         "zig-cache"
+;;         "zig-out"
+;;         "__pycache__"
+;;         ".venv"
+;;         "venv"
+;;         ".mypy_cache"
+;;         ".pytest_cache"
+;;         ".ruff_cache"
+;;         ".tox"
+;;         "build"
+;;         "dist"))
+
+;; Seconds after which listing the files of a project is given up.
+;; (setq mega-project-list-timeout 20)
+
+;;;; Trust
+
+;; Whether opening a file of a project asks what is undecided about it.  That
+;; is whether to trust the project, if that was never said, and then what
+;; `mega-trust-opened-functions' have to ask.  With nil nothing is asked when
+;; a file is opened: `C-c y' trusts a project, and the commands that need
+;; trust ask for it.
+;; (setq mega-trust-ask-on-open t)
+
+;;;; Building, running and debugging
+
+;; Tasks you define yourself, per project.  An alist of (ROOT . TASKS): ROOT
+;; is a project root as `C-c x x' shows it, TASKS a list of (NAME PROGRAM
+;; ARG...) like in `mega-project-kinds'.  They come before, and so replace,
+;; the ones MEGA works out.
+;; (setq mega-task-overrides nil)
+
+;; Which debugger to take where more than one would do, best first.  Each name
+;; is a family: `lldb' is lldb, rust-lldb and lldb's debug adapter; `gdb' is
+;; gdb and rust-gdb, in either of its two guises.
+;;
+;; This outranks `mega-debug-backend': the debugger you prefer is used through
+;; the best interface it has, even where another debugger would offer a better
+;; one.
+;; (setq mega-debug-prefer '(lldb gdb))
+
+;; How MEGA talks to a debugger.  `gud' is Emacs's own debugger interface;
+;; `dap' is a debug adapter, see mega-dap.el.  `auto' takes the adapter where
+;; the full interface cannot be had, which is inside a container, and Emacs's
+;; own everywhere else.  Wherever no usable adapter is found, Emacs's own
+;; interface is used.
+;; One of: auto, gud, dap.
+;; (setq mega-debug-backend 'auto)
+
+;; Non-nil to let debuggers fetch debug information from debuginfod servers.
+;; Nil, the default, starts every debugger with no server to ask.  Set it in
+;; local.el; it is read when MEGA starts and again at each debugger.
+;; (setq mega-debug-debuginfod nil)
+
+;;;; Dev containers
+
+;; The program that runs containers: `auto', "podman" or "docker".  `auto'
+;; takes podman if it is installed, else docker.
+;; One of: auto, or a string.
+;; (setq mega-container-engine 'auto)
+
+;;;; Claude
+
+;; The Claude command-line program.
+;; (setq mega-claude-program "claude")
+
+;; The model one-shot questions use, or nil for the program's own default.
+;; (setq mega-claude-model nil)
+
+;; Where a Claude session runs.  `tmux' opens a pane beside Emacs, `emacs' a
+;; terminal buffer; `auto' is tmux when Emacs itself runs inside tmux.
+;; One of: auto, tmux, emacs.
+;; (setq mega-claude-terminal 'auto)
+
+;; Extra arguments for the program when it starts a session.
+;; (setq mega-claude-arguments nil)
+
+;; Arguments for a one-shot question.  As given they mean: answer and exit; no
+;; tools, so nothing is read, written or run; no MCP servers; your own
+;; settings only, not a project's; anything that would need permission is
+;; refused; and the exchange is not kept on disk.  The question is not among
+;; them: it is sent on standard input.
+;; (setq mega-claude-print-arguments
+;;       '("--print"
+;;         "--output-format"
+;;         "text"
+;;         "--tools"
+;;         ""
+;;         "--strict-mcp-config"
+;;         "--setting-sources"
+;;         "user"
+;;         "--permission-prompts"
+;;         "none"
+;;         "--no-session-persistence"))
+
+;;;; Privacy
+
+;; Regexps matching files whose names or contents MEGA must not remember.
+;; Backups and auto-saves still cover such a file: losing work is worse than
+;; keeping a copy in a directory only you can read.
+;; (setq mega-private-file-regexps
+;;       '("\\.gpg\\'"
+;;         "\\.age\\'"
+;;         "\\.asc\\'"
+;;         "\\.pem\\'"
+;;         "\\.key\\'"
+;;         "\\.p12\\'"
+;;         "\\.pfx\\'"
+;;         "\\.kdbx?\\'"
+;;         "\\.tfvars\\(?:\\.json\\)?\\'"
+;;         "/\\.ssh/"
+;;         "/\\.gnupg/"
+;;         "/\\.password-store/"
+;;         "/\\.aws/"
+;;         "/\\.kube/config\\'"
+;;         "/\\.docker/config\\.json\\'"
+;;         "/id_\\(?:rsa\\|dsa\\|ecdsa\\|ed25519\\)[^/]*\\'"
+;;         "/\\.env\\(?:\\.[^/]*\\)?\\'"
+;;         "/\\.netrc\\'"
+;;         "/\\.authinfo\\'"
+;;         "/\\.npmrc\\'"
+;;         "/\\.pypirc\\'"
+;;         "/\\.git-credentials\\'"
+;;         "/\\.pgpass\\'"
+;;         "/\\.htpasswd\\'"
+;;         "/\\.?\\(?:secrets?\\|credentials\\)\\(?:\\.\\(?:ya?ml\\|json\\|toml\\|ini\\|env\\|txt\\)\\)?\\'"
+;;         "\\`/dev/shm/"
+;;         "\\`/run/user/"))
+
+;; Regexps matching files that exist for the length of one command.  A commit
+;; message is the usual one.  Nothing about them is worth keeping.
+;; (setq mega-passing-file-regexps
+;;       '("/COMMIT_EDITMSG\\'"
+;;         "/MERGE_MSG\\'"
+;;         "/TAG_EDITMSG\\'"
+;;         "/SQUASH_MSG\\'"
+;;         "/git-rebase-todo\\'"
+;;         "/addp-hunk-edit\\.diff\\'"))
+
+;; Directories whose files are temporary: nothing about them is remembered.  A
+;; secret is often written to one for the time it takes to edit it.
+;; (setq mega-temporary-directories
+;;       (delete-dups
+;;        (mapcar #'file-name-as-directory
+;;                (delq nil
+;;                      (list temporary-file-directory (getenv "TMPDIR") "/tmp"
+;;                            "/var/tmp" (getenv "XDG_RUNTIME_DIR"))))))
+
+;; Non-nil to make every git started from Emacs ignore two risky settings.
+;; See the comment above this option in mega-core.el.  Set it in local.el; it
+;; is read once, when MEGA starts.
+;; (setq mega-git-hardening t)
+
+;;;; Workspaces
+
+;; Whether leaving Emacs saves the session as an automatic workspace.
+;; (setq mega-workspace-save-on-exit t)
+
+;; How many automatic workspaces to keep; the oldest go first.
+;; (setq mega-workspace-keep-automatic 20)
+
+;;;; MEGA's compiled copy
+
+;; Non-nil to keep a compiled copy of MEGA's own Lisp, made when needed.  It
+;; is made in the background after a start that had to run from source, and
+;; used from the next start on.  Nil means MEGA makes none; a copy that is
+;; there already is still used: `M-x mega-compile-forget' deletes it.
+;; (setq mega-compile t)
+
+;;;; Screensaver
+
+;; Idle seconds before the screensaver starts, or nil for never.  After
+;; changing it in a running Emacs, call `mega-zone-refresh'.
+;; (setq mega-zone-idle-seconds nil)
+
+;; The `zone' programs MEGA runs.  A cheap subset on purpose: some of the
+;; others keep the processor busy, which is not what something that runs while
+;; you are away should do.
+;; (setq mega-zone-programs
+;;       '(zone-pgm-jitter
+;;         zone-pgm-whack-chars
+;;         zone-pgm-drip
+;;         zone-pgm-martini-swan-dive
+;;         zone-pgm-rotate))
+
+;;;; Recipes: what is not a setting of MEGA's
+
+;; The line-length limit, and so the ruler, by default; a project's
+;; .editorconfig still overrides it.  MEGA sets Emacs's own defaults as it
+;; loads, which is after this file: so this waits for that.
+;; (with-eval-after-load 'mega-core
+;;   (setq-default fill-column 100))
+
+;; How wide a tab is drawn, by default.  Whether to indent with tabs is for
+;; a project's .editorconfig, and then for the file: see
+;; `mega-edit-indent-as-the-file'.
+;; (with-eval-after-load 'mega-core
+;;   (setq-default tab-width 8))
+
+;; No ruler in prose.
+;; (with-eval-after-load 'mega-ui
+;;   (remove-hook 'text-mode-hook #'mega-ui-ruler))
+
+;; One more kind of file MEGA must not remember, beside its own.
+;; (add-to-list 'mega-private-file-regexps "/vault/")
+
+;; Keys of your own, shown in the cheat sheet with MEGA's, and one of MEGA's
+;; taken away, which gives the key back to Emacs.
+;; (with-eval-after-load 'mega-keys
+;;   (mega-keys-add "Mine"
+;;                  '("C-c w" whitespace-mode "Show spaces and tabs"))
+;;   (mega-keys-remove "C-c D"))
 
 ;;; local.example.el ends here

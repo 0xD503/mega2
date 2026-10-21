@@ -204,7 +204,8 @@ compose without the official CLI; RON mode; anything GUI-specific.
 ```
 early-init.el     version gate, where files go, startup cost
 init.el           the module list
-local.example.el  machine overrides to start a local.el from; git ignores
+local.example.el  every setting, commented out with what it does and its
+                  value, and recipes, to start a local.el from; git ignores
                   local.el itself
 lisp/
   base      mega-lib  mega-core  mega-keys  mega-ui  mega-themes
@@ -531,6 +532,13 @@ Things learned while building it, worth keeping in mind:
   between tabs, and the two look alike on the screen. The same history
   shows it: four spaces deleted by hand and typed again. A file's own
   lines now decide where the project, the file and the mode say nothing.
+- An example in a comment is code that nothing runs. The template's first
+  example, `(setq-default fill-column 100)`, had never worked: local.el
+  loads before the modules, and mega-core sets the same default after it.
+  The template is now every setting and a few recipes, and a test loads
+  all of it uncommented in an Emacs of its own and checks what each recipe
+  does, and that every setting is there with the value and the words it
+  has in the code.
 - Tests are worth only what they can fail on. Each milestone's safety,
   privacy and security checks were run against deliberately broken copies
   of the code (`MEGA_TEST_CONFIG` points the suite at a copy).

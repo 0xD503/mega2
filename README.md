@@ -275,7 +275,12 @@ downloading parsers, and deleting what MEGA has stored.
 | Remove a feature | delete its line in `init.el`; its keys go with it |
 
 `local.el` is yours: git ignores it, so an update never touches it. Start
-from the examples with `cp local.example.el local.el`.
+it with `cp local.example.el local.el`: that file holds every setting MEGA
+has, by subject, each with what it does and the value it has, all commented
+out, and at the end recipes for Emacs's own defaults, keys of your own and
+the like. To change a setting, uncomment its lines (select them, `C-c C-c`)
+and change the value. A test holds the template to MEGA, so it is never out
+of date.
 
 There are three themes. `mega-hacker`, the one MEGA starts with, is green on
 black, after the old screens: a background that is all but black, text in
