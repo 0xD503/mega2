@@ -118,7 +118,7 @@ Nothing was configured: this is plain Emacs."
     (add-hook 'emacs-startup-hook #'mega--report-unsupported)
 
   ;; Machine-specific overrides.  local.el is yours: git ignores it, and
-  ;; local.example.el is there to start it from.  It loads before the modules
+  ;; local.el.example is there to start it from.  It loads before the modules
   ;; because its main job is choosing: anything a module reads while loading
   ;; must already be set.  Whatever has to happen after a module loads goes
   ;; in `with-eval-after-load'.

@@ -1,8 +1,8 @@
-;;; mega-settings-test.el --- Tests for local.example.el, the settings template  -*- lexical-binding: t; -*-
+;;; mega-settings-test.el --- Tests for local.el.example, the settings template  -*- lexical-binding: t; -*-
 
 ;;; Commentary:
 
-;; local.example.el lists every setting MEGA has, commented out, with what it
+;; local.el.example lists every setting MEGA has, commented out, with what it
 ;; does and the value it has.  Asked for after use: a template to start
 ;; local.el from, so that nobody has to look around for what can be set.
 ;; Written by hand once, it would be wrong by the next release; these tests
@@ -20,7 +20,7 @@
     (require (intern (file-name-sans-extension file)))))
 
 (defconst mega-settings-test--template
-  (expand-file-name "../local.example.el" mega-test-dir)
+  (expand-file-name "../local.el.example" mega-test-dir)
   "The template, in the repository the tests are in.")
 
 (defconst mega-settings-test--variables

@@ -334,6 +334,27 @@ What it is at and what waits; 0 where Emacs does none of that."
          (hash-table-count (symbol-value 'comp-async-compilations))
        0)))
 
+(defun mega-compile--never-native ()
+  "MEGA's functions that are never native code, and why: (MADE . INIT).
+MADE is how many are made as MEGA starts, one for each language of
+`mega-languages': Emacs compiles such a function to bytecode and no
+further.  INIT is how many are in early-init.el and init.el, which
+Emacs reads as source, before there is a compiled copy to read."
+  (let ((made 0) (init 0))
+    (dolist (spec (bound-and-true-p mega-languages))
+      (let ((symbol (intern-soft (format "mega-lang-%s" (car spec)))))
+        (when (and symbol (byte-code-function-p (symbol-function symbol)))
+          (setq made (1+ made)))))
+    (mapatoms
+     (lambda (symbol)
+       (when (and (fboundp symbol)
+                  (string-prefix-p "mega-" (symbol-name symbol))
+                  (interpreted-function-p (symbol-function symbol))
+                  (string-match-p "/\\(?:early-\\)?init\\.el\\'"
+                                  (or (symbol-file symbol 'defun) "")))
+         (setq init (1+ init)))))
+    (cons made init)))
+
 (defun mega-compile-forms ()
   "How MEGA's functions are held in this session: (NATIVE BYTE SOURCE), counts."
   (let ((native 0) (byte 0) (source 0))
@@ -365,6 +386,17 @@ What it is at and what waits; 0 where Emacs does none of that."
                                    (format "; Emacs is making native code of %d more file%s"
                                            left (if (= left 1) "" "s"))
                                  ""))))
+    ;; Some never are native, and are not meant to be: said, so that the
+    ;; count is not taken for a fault.
+    (when (and (> native 0) (zerop (mega-compile--native-pending)))
+      (pcase-let ((`(,made . ,init) (mega-compile--never-native)))
+        (insert
+         (format "\n  Not native, and not meant to be: %d made as MEGA starts, one for\n  each language, which Emacs compiles no further than bytecode; %d in\n  early-init.el and init.el, which Emacs reads as source.%s\n"
+                 made init
+                 (let ((rest (+ (- byte made) (- source init))))
+                   (if (> rest 0)
+                       (format "  %d more are not native\n  yet: Emacs makes native code of a module in the first session that\n  loads it, and runs it from the next." rest)
+                     ""))))))
     (mega-doctor-row
      "the compiled copy"
      (cond (mega-compiled-p (abbreviate-file-name mega-compiled-dir))

@@ -98,7 +98,11 @@ file `fingerprint' written last.")
 
 (mega-protect-directories)
 
-(when (fboundp 'startup-redirect-eln-cache)
+;; Only where there is native code: an Emacs built without it has the
+;; function all the same, and it fails there, on a variable that only
+;; native compilation defines.
+(when (and (fboundp 'startup-redirect-eln-cache)
+           (boundp 'native-comp-eln-load-path))
   (startup-redirect-eln-cache (mega-cache "eln/")))
 
 ;; MEGA installs nothing.  package.el is never initialised, and with no

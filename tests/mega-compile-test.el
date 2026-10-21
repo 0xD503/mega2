@@ -15,6 +15,7 @@
 
 (require 'mega-test-helper)
 (require 'mega-compile)
+(require 'mega-doctor)
 
 (defun mega-compile-test--contents (file)
   "What FILE holds."
@@ -581,6 +582,52 @@ is more settings, each NAME=VALUE."
     (should (re-search-forward "^(unless noninteractive\n  (mega-compile--schedule))" nil t))
     (goto-char (point-min))
     (should-not (re-search-forward "(add-hook 'emacs-startup-hook" nil t))))
+
+(ert-deftest mega-compile-the-doctor-says-what-is-never-native-and-why ()
+  "Asked after use: 614 native, 19 compiled, 2 source, always; a fault?
+No: one function per language is made as MEGA starts, which Emacs takes
+no further than bytecode, and two are in the init files, read as source."
+  (pcase-let ((`(,made . ,init) (mega-compile--never-native)))
+    ;; One per language, compiled where this session runs compiled code.
+    (should (= made (if mega-compiled-p (length mega-languages) 0)))
+    ;; The init files' own, which this session read as Emacs does.
+    (should (>= init 2)))
+  (cl-flet ((doctor (forms never pending)
+              (cl-letf (((symbol-function 'mega-compile-forms) (lambda () forms))
+                        ((symbol-function 'mega-compile--never-native) (lambda () never))
+                        ((symbol-function 'mega-compile--native-pending) (lambda () pending))
+                        ((symbol-function 'mega-compile--failure) #'ignore))
+                (with-temp-buffer
+                  (let ((mega-compiled-p t))
+                    (mega-compile--doctor))
+                  (replace-regexp-in-string "[ \n]+" " " (buffer-string))))))
+    (let ((said (doctor '(614 19 2) '(19 . 2) 0)))
+      (should (string-search "614 native, 19 compiled, 2 source" said))
+      (should (string-search "19 made as MEGA starts, one for each language" said))
+      (should (string-search "2 in early-init.el and init.el" said))
+      (should-not (string-search "more are not native" said)))
+    ;; More than those: on their way, and said so.
+    (should (string-search "3 more are not native yet"
+                           (doctor '(600 21 3) '(19 . 2) 0)))
+    ;; While Emacs is still at it the count is not the last word: no note.
+    (should-not (string-search "Not native, and not meant to be"
+                               (doctor '(300 330 2) '(19 . 2) 4)))
+    ;; Nor where nothing is native at all: Emacs without native code.
+    (should-not (string-search "Not native, and not meant to be"
+                               (doctor '(0 633 2) '(19 . 2) 0)))))
+
+(ert-deftest mega-compile-an-emacs-without-native-code-is-no-fault ()
+  "Asked for: MEGA works without native compilation, as a fallback."
+  (cl-letf (((symbol-function 'mega-doctor--native-p) #'ignore))
+    (with-temp-buffer
+      (mega-doctor--emacs)
+      (let ((row (save-excursion
+                   (goto-char (point-min))
+                   (re-search-forward "native compilation.*$")
+                   (match-string 0))))
+        (should (string-search "not in this Emacs: MEGA runs as bytecode instead" row))
+        (should-not (memq (get-text-property (- (match-end 0) 2) 'face)
+                          '(error warning)))))))
 
 (ert-deftest mega-compile-the-doctor-says-what-this-session-runs ()
   (let ((process-environment (cons "MEGA_SOURCE=" process-environment)))

@@ -59,15 +59,21 @@ it, or the message of the error loading it raised.")
 
 ;;;; Sections
 
+(defun mega-doctor--native-p ()
+  "Non-nil if this Emacs can compile Lisp to native code."
+  (and (fboundp 'native-comp-available-p) (native-comp-available-p)))
+
 (defun mega-doctor--emacs ()
   "Insert the section about Emacs itself."
   (mega-doctor-heading "Emacs")
   (mega-doctor-row "version" emacs-version)
   (mega-doctor-row "MEGA" mega-version)
-  (mega-doctor-check "native compilation"
-                     (and (fboundp 'native-comp-available-p)
-                          (native-comp-available-p))
-                     "yes" "no")
+  ;; Not having it is no fault: MEGA runs as bytecode then, from its
+  ;; compiled copy, a little slower.
+  (if (mega-doctor--native-p)
+      (mega-doctor-row "native compilation" "yes" 'success)
+    (mega-doctor-row "native compilation"
+                     "not in this Emacs: MEGA runs as bytecode instead"))
   (mega-doctor-check "tree-sitter"
                      (and (fboundp 'treesit-available-p) (treesit-available-p))
                      "yes" "no")

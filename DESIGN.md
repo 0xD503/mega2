@@ -183,7 +183,7 @@ project shell; editable grep results; GUD debuggers (gdb, lldb, pdb).
 | Snippets | LSP-syntax tab stops; user snippets per mode |
 | Dev Containers | See below |
 | Claude | Project session in a tmux pane or a terminal buffer; one-shot ask, explain and rewrite-with-diff through `claude --print` |
-| Themes | Three, each a palette of seventeen colours named for what they are used for: green on black, which MEGA starts with, Nord, and Ayu Dark as Zed has it. On a terminal of 8 or 16 colours each falls back to one and the same look in the terminal's eight colours by name; below 8 nothing is applied. Which face gets which part is written once for all of them, and tests hold every colour on the screen to a palette and every colour of text to a measured contrast with what it is written on. `mega-theme` in `local.el` chooses; `M-x mega-theme` switches for a session |
+| Themes | Three, each a palette of seventeen colours named for what they are used for: Ayu Dark as Zed has it, which MEGA starts with, green on black, and Nord. On a terminal of 8 or 16 colours each falls back to one and the same look in the terminal's eight colours by name; below 8 nothing is applied. Which face gets which part is written once for all of them, and tests hold every colour on the screen to a palette and every colour of text to a measured contrast with what it is written on. `mega-theme` in `local.el` chooses; `M-x mega-theme` switches for a session |
 | Undo | Tree drawn from Emacs's own undo list; history persisted per file. What an undo did is shown, by the key or by a step in the tree: the echo area names what it took away, and what it put back is marked where it stands until the next key or for two seconds. It looks on while Emacs undoes and changes neither text nor history |
 | Debugging | Picks the debugger and the program for the project; one set of keys for gdb, lldb and pdb. On the host through GUD, in a container through a debug adapter |
 | Debug adapter client | Own client for the Debug Adapter Protocol: breakpoints that outlive sessions, stack, variables, output |
@@ -204,7 +204,7 @@ compose without the official CLI; RON mode; anything GUI-specific.
 ```
 early-init.el     version gate, where files go, startup cost
 init.el           the module list
-local.example.el  every setting, commented out with what it does and its
+local.el.example  every setting, commented out with what it does and its
                   value, and recipes, to start a local.el from; git ignores
                   local.el itself
 lisp/
@@ -532,6 +532,15 @@ Things learned while building it, worth keeping in mind:
   between tabs, and the two look alike on the screen. The same history
   shows it: four spaces deleted by hand and typed again. A file's own
   lines now decide where the project, the file and the mode say nothing.
+- That a function is there does not say that it works. MEGA was to run
+  on an Emacs without native compilation, and early-init.el asked
+  `(fboundp 'startup-redirect-eln-cache)` before moving the native-code
+  cache: the function is in every Emacs, and in one without native
+  compilation it fails on a variable only native compilation defines.
+  The error stopped early-init.el, and MEGA configured nothing at all.
+  Every other place that touches native code had been read and found
+  guarded; only an Emacs built without it showed this one. The whole
+  suite has been run on such an Emacs since.
 - An example in a comment is code that nothing runs. The template's first
   example, `(setq-default fill-column 100)`, had never worked: local.el
   loads before the modules, and mega-core sets the same default after it.

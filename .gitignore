@@ -1,4 +1,4 @@
-# Yours: this machine's settings.  Start it from local.example.el.
+# Yours: this machine's settings.  Start it from local.el.example.
 /local.el
 
 # Byte- and native-compiled Lisp is built on the machine, never tracked.

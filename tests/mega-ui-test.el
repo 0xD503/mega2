@@ -66,10 +66,10 @@ go by: 4.5 is enough for text, 3 for large or bold text."
       (/ (+ high 0.05) (+ low 0.05)))))
 
 (ert-deftest mega-ui-the-theme-is-on-and-is-the-only-one ()
-  (should (eq mega-theme 'mega-hacker))
-  (should (equal custom-enabled-themes '(mega-hacker)))
+  (should (eq mega-theme 'mega-ayu))
+  (should (equal custom-enabled-themes '(mega-ayu)))
   ;; The one MEGA starts with unasked is the first.
-  (should (equal mega-themes '(mega-hacker mega-nord mega-ayu)))
+  (should (equal mega-themes '(mega-ayu mega-hacker mega-nord)))
   (should (eq (default-toplevel-value 'mega-theme) (car mega-themes)))
   ;; Each has its file, and the file that they share is not taken for one.
   (dolist (theme mega-themes)
@@ -189,6 +189,8 @@ go by: 4.5 is enough for text, 3 for large or bold text."
         (should (equal custom-enabled-themes '(mega-nord)))
         (mega-theme 'mega-hacker)
         (should (equal custom-enabled-themes '(mega-hacker)))
+        (mega-theme 'mega-ayu)
+        (should (equal custom-enabled-themes '(mega-ayu)))
         ;; At the start it is what local.el says.
         (let ((mega-theme 'mega-nord))
           (mega-ui-start-theme)
@@ -200,12 +202,12 @@ go by: 4.5 is enough for text, 3 for large or bold text."
           (cl-letf (((symbol-function 'display-warning)
                      (lambda (_type message &rest _) (push message warned))))
             (mega-ui-start-theme))
-          (should (equal custom-enabled-themes '(mega-hacker)))
+          (should (equal custom-enabled-themes '(mega-ayu)))
           (should (equal (length warned) 1))
           (should (string-search "mega-nrod" (car warned)))
           (should (string-search "mega-nord" (car warned)))))
-    (mega-theme 'mega-hacker))
-  (should (equal custom-enabled-themes '(mega-hacker))))
+    (mega-theme 'mega-ayu))
+  (should (equal custom-enabled-themes '(mega-ayu))))
 
 (ert-deftest mega-ui-a-terminal-of-few-colours-gets-eight ()
   "Asked for after use: a theme for a terminal of 8 or 16 colours.

@@ -22,16 +22,16 @@
 ;; The themes are files of MEGA's own, next to this one, and one of them is
 ;; on.  What they have in common is in mega-themes.el.
 
-(defconst mega-themes '(mega-hacker mega-nord mega-ayu)
+(defconst mega-themes '(mega-ayu mega-hacker mega-nord)
   "The themes MEGA comes with, the one it starts with first.
-`mega-hacker' is green on black; `mega-nord' is the Nord palette;
-`mega-ayu' is Ayu Dark.  On a terminal of 8 or 16 colours they all look
+`mega-ayu' is Ayu Dark; `mega-hacker' is green on black; `mega-nord' is
+the Nord palette.  On a terminal of 8 or 16 colours they all look
 the same: see `mega-themes-ansi-palette'.")
 
 (defcustom mega-theme (car mega-themes)
   "The theme MEGA starts with: one of `mega-themes'.
 Set it in local.el.  `M-x mega-theme' changes the theme of a session."
-  :type '(choice (const mega-hacker) (const mega-nord) (const mega-ayu))
+  :type '(choice (const mega-ayu) (const mega-hacker) (const mega-nord))
   :group 'mega)
 
 (add-to-list 'custom-theme-load-path mega-lisp-dir)

@@ -1,4 +1,4 @@
-;;; local.example.el --- Every MEGA setting, to start local.el from  -*- lexical-binding: t; -*-
+;;; local.el.example --- Every MEGA setting, to start local.el from  -*- mode: emacs-lisp; lexical-binding: t; -*-
 
 ;;; Commentary:
 
@@ -6,7 +6,7 @@
 ;; alone should have.  Git ignores local.el, so an update of MEGA never
 ;; touches it, and one machine's settings never travel to another.
 ;;
-;;   cp local.example.el local.el
+;;   cp local.el.example local.el
 ;;
 ;; Below is every setting MEGA has, by subject: what it does, and the value
 ;; it has while nothing is said about it.  At the end are recipes for what
@@ -32,8 +32,8 @@
 
 ;; The theme MEGA starts with: one of `mega-themes'.  Set it in local.el.
 ;; `M-x mega-theme' changes the theme of a session.
-;; One of: mega-hacker, mega-nord, mega-ayu.
-;; (setq mega-theme 'mega-hacker)
+;; One of: mega-ayu, mega-hacker, mega-nord.
+;; (setq mega-theme 'mega-ayu)
 
 ;; Non-nil to use the mouse in a terminal.  With it on, the terminal's own
 ;; text selection needs Shift held down.  Under tmux the mouse reaches Emacs
@@ -448,4 +448,4 @@
 ;;                  '("C-c w" whitespace-mode "Show spaces and tabs"))
 ;;   (mega-keys-remove "C-c D"))
 
-;;; local.example.el ends here
+;;; local.el.example ends here

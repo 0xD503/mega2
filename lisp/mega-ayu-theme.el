@@ -9,12 +9,8 @@
 ;; the newer would not read: the error red, the brightest text, and a
 ;; selection that is blue as Ayu's is but solid.
 ;;
-;; Which face gets which of these colours is in mega-themes.el.  To use it,
-;; in local.el:
-;;
-;;   (setq mega-theme 'mega-ayu)
-;;
-;; or `M-x mega-theme' to try it for a session.
+;; Which face gets which of these colours is in mega-themes.el.  It is the
+;; theme MEGA starts with.
 
 ;;; Code:
 

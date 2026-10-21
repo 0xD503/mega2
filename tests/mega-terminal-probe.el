@@ -781,10 +781,10 @@ copy as native code.  Anything else: from source."
   (if (>= (display-color-cells) 256)
       ;; The theme reached the screen, not merely the theme list.
       (progn
-        (unless (equal (face-attribute 'default :background) "#0A0F0C")
+        (unless (equal (face-attribute 'default :background) "#0D1016")
           (mega-terminal-probe--problem "default background is %s"
                                         (face-attribute 'default :background)))
-        (unless (equal (face-attribute 'font-lock-string-face :foreground) "#4DFF88")
+        (unless (equal (face-attribute 'font-lock-string-face :foreground) "#AAD94C")
           (mega-terminal-probe--problem "strings are %s"
                                         (face-attribute 'font-lock-string-face
                                                         :foreground))))

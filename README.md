@@ -87,7 +87,10 @@ repository. After an update only the files that changed go through this
 again. `M-x mega-doctor` says which form is running, under "MEGA's own
 Lisp": how many functions are native, compiled or source, and whether Emacs
 is still making native code, in which case the count is on its way up.
-`M-x mega-compile-now` makes the copy at once, for the next start.
+`M-x mega-compile-now` makes the copy at once, for the next start. A few
+functions are never native and are not meant to be, and the doctor says
+which. An Emacs built without native compilation runs the compiled copy as
+bytecode instead: everything works, a little slower.
 
 ## Keys
 
@@ -266,7 +269,7 @@ downloading parsers, and deleting what MEGA has stored.
 | Want to… | Edit |
 | --- | --- |
 | Change something on this machine only | `local.el` |
-| Change the theme | `(setq mega-theme 'mega-nord)` or `'mega-ayu` in `local.el`; `M-x mega-theme` for this session only |
+| Change the theme | `(setq mega-theme 'mega-hacker)` or `'mega-nord` in `local.el`; `M-x mega-theme` for this session only |
 | Add, move or remove a key | `mega-keys-add` / `mega-keys-remove`, in `local.el`; the cheat sheet follows |
 | Change a global default | `lisp/mega-core.el` |
 | Add a language: modes, server, formatter, indentation | one row of `mega-languages` in `lisp/mega-lang.el` |
@@ -275,18 +278,18 @@ downloading parsers, and deleting what MEGA has stored.
 | Remove a feature | delete its line in `init.el`; its keys go with it |
 
 `local.el` is yours: git ignores it, so an update never touches it. Start
-it with `cp local.example.el local.el`: that file holds every setting MEGA
+it with `cp local.el.example local.el`: that file holds every setting MEGA
 has, by subject, each with what it does and the value it has, all commented
 out, and at the end recipes for Emacs's own defaults, keys of your own and
 the like. To change a setting, uncomment its lines (select them, `C-c C-c`)
 and change the value. A test holds the template to MEGA, so it is never out
 of date.
 
-There are three themes. `mega-hacker`, the one MEGA starts with, is green on
-black, after the old screens: a background that is all but black, text in
-the green of phosphor, and what stands out from it bright. `mega-nord` is
-the Nord palette, soft and blue-grey. `mega-ayu` is Ayu Dark, as Zed has
-it: blue-black, keywords orange, functions yellow. They need a terminal of
+There are three themes. `mega-ayu`, the one MEGA starts with, is Ayu Dark,
+as Zed has it: blue-black, keywords orange, functions yellow.
+`mega-hacker` is green on black, after the old screens: a background that is
+all but black, text in the green of phosphor, and what stands out from it
+bright. `mega-nord` is the Nord palette, soft and blue-grey. They need a terminal of
 256 colours or more. On one of 8 or 16, whichever is chosen, MEGA uses the
 eight colours every terminal has, by name, so that the terminal draws them
 in its own shades: white on black, keywords cyan, functions yellow, strings
@@ -369,6 +372,7 @@ tests/run.sh                 # everything, in a sandbox
 tests/run.sh bench           # only the timings
 MEGA_TEST_ONLY=mega-undo tests/run.sh unit    # only the tests so named
 MEGA_REAL_IMAGE=my/image tests/run.sh container   # a real container: see below
+EMACS=/path/to/emacs tests/run.sh                 # another Emacs, e.g. one without native compilation
 ```
 
 The tests run on both forms of MEGA's Lisp, source and compiled, and a real

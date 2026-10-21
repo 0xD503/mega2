@@ -8,8 +8,12 @@
 ;; against the background every colour that text is written in has a
 ;; contrast of 4.5 to 1 or more, which a test checks.
 ;;
-;; Which face gets which of these colours is in mega-themes.el.  It is the
-;; theme MEGA starts with.
+;; Which face gets which of these colours is in mega-themes.el.  To use it,
+;; in local.el:
+;;
+;;   (setq mega-theme 'mega-hacker)
+;;
+;; or `M-x mega-theme' to try it for a session.
 
 ;;; Code:
 
