@@ -318,20 +318,60 @@ from 8 up, and not at all below: a terminal of two keeps its own."
 
 ;;;; Line numbers and the ruler
 
-(ert-deftest mega-ui-the-ruler-is-at-80-in-code-config-and-prose ()
+(defun mega-ui-test--lines ()
+  "How the current buffer shows its lines: (NUMBERS RULER TRUNCATED)."
+  (list (and (bound-and-true-p display-line-numbers-mode) t)
+        (and (bound-and-true-p display-fill-column-indicator-mode) t)
+        (and truncate-lines t)))
+
+(ert-deftest mega-ui-every-file-has-line-numbers-a-ruler-and-unwrapped-lines ()
+  "Asked for after use: line numbers always, the ruler on any kind of file at
+80 columns, and no soft wrap unless asked for."
+  (mega-test-with-directory dir
+    (let ((inhibit-message t))
+      ;; Code, configuration, prose, and a kind of file Emacs knows nothing of.
+      (dolist (name '("tool.py" "settings.conf" "notes.txt" "readings.xyz"))
+        (mega-test-visiting buffer
+            (mega-test-write (expand-file-name name dir)
+                             "short" (make-string 300 ?x) "")
+          (should (equal (mega-ui-test--lines) '(t t t)))
+          ;; t means "wherever `fill-column' is".
+          (should (eq display-fill-column-indicator-column t))
+          (should (= fill-column 80))))))
+  ;; And code, configuration and prose that are not a file yet.
   (dolist (mode '(prog-mode conf-mode text-mode))
     (with-temp-buffer
       (funcall mode)
-      (should display-fill-column-indicator-mode)
-      ;; t means "wherever `fill-column' is".
-      (should (eq display-fill-column-indicator-column t))
-      (should (= fill-column 80)))))
+      (should (equal (mega-ui-test--lines) '(t t t))))))
 
-(ert-deftest mega-ui-no-ruler-where-there-is-no-text-to-limit ()
+(ert-deftest mega-ui-not-where-there-is-nothing-to-edit ()
   (dolist (mode '(fundamental-mode special-mode))
     (with-temp-buffer
       (funcall mode)
-      (should-not display-fill-column-indicator-mode))))
+      (should (equal (mega-ui-test--lines) '(nil nil nil)))))
+  ;; A picture, a listing of an archive, a file so-long has taken over.
+  (dolist (mode '(image-mode archive-mode tar-mode doc-view-mode so-long-mode))
+    (with-temp-buffer
+      (let ((major-mode mode))
+        (should-not (mega-ui--text-p))))))
+
+(ert-deftest mega-ui-each-of-the-three-can-be-switched-off ()
+  (let ((mega-line-numbers nil))
+    (with-temp-buffer (prog-mode) (should (equal (mega-ui-test--lines) '(nil t t)))))
+  (let ((mega-ruler nil))
+    (with-temp-buffer (prog-mode) (should (equal (mega-ui-test--lines) '(t nil t)))))
+  (let ((mega-wrap-lines t))
+    (with-temp-buffer (prog-mode) (should (equal (mega-ui-test--lines) '(t t nil)))))
+  ;; A buffer that wraps at the ends of words is left to do so.
+  (with-temp-buffer
+    (text-mode)
+    (visual-line-mode 1)
+    (mega-ui-lines)
+    (should-not truncate-lines))
+  ;; A long line is followed sideways, a column at a time, and the wheel
+  ;; tilted sideways scrolls it.
+  (should (= hscroll-step 1))
+  (should mouse-wheel-tilt-scroll))
 
 (ert-deftest mega-ui-the-ruler-follows-editorconfig ()
   (mega-test-with-directory project
@@ -346,14 +386,6 @@ from 8 up, and not at all below: a terminal of two keeps its own."
     (mega-test-visiting buffer
         (mega-test-write (expand-file-name "tool.sh" project) "x=1" "")
       (should (= fill-column 80)))))
-
-(ert-deftest mega-ui-line-numbers-in-code-only ()
-  (with-temp-buffer
-    (prog-mode)
-    (should display-line-numbers-mode))
-  (with-temp-buffer
-    (text-mode)
-    (should-not display-line-numbers-mode)))
 
 ;;;; The rest
 

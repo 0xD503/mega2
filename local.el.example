@@ -35,6 +35,19 @@
 ;; One of: mega-ayu, mega-hacker, mega-nord.
 ;; (setq mega-theme 'mega-ayu)
 
+;; Non-nil to show line numbers in every file.
+;; (setq mega-line-numbers t)
+
+;; Non-nil to show the ruler in every file, at `fill-column'.  That is 80
+;; unless set otherwise, here or by a project's .editorconfig.
+;; (setq mega-ruler t)
+
+;; Non-nil to wrap a line too long for its window onto the next screen line.
+;; Nil keeps it one line: it runs off the right edge, marked there with a
+;; `$', and the window scrolls sideways to follow the cursor.  A buffer in
+;; `visual-line-mode' wraps at the ends of words either way.
+;; (setq mega-wrap-lines nil)
+
 ;; Non-nil to use the mouse in a terminal.  With it on, the terminal's own
 ;; text selection needs Shift held down.  Under tmux the mouse reaches Emacs
 ;; only if tmux has `mouse on'.
@@ -434,9 +447,9 @@
 ;; (with-eval-after-load 'mega-core
 ;;   (setq-default tab-width 8))
 
-;; No ruler in prose.
-;; (with-eval-after-load 'mega-ui
-;;   (remove-hook 'text-mode-hook #'mega-ui-ruler))
+;; Long lines of prose wrapped at the ends of words, where code and the
+;; rest stay one line each: see `mega-wrap-lines'.
+;; (add-hook 'text-mode-hook #'visual-line-mode)
 
 ;; One more kind of file MEGA must not remember, beside its own.
 ;; (add-to-list 'mega-private-file-regexps "/vault/")

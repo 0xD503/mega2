@@ -812,6 +812,44 @@ ${line%%:*}: the cursor is on '${at#* }'"
         printf '%s\n' "$out" | cut -c1-200 | detail
     fi
 
+    # Three: a file of a kind Emacs knows nothing of, with a line far longer
+    # than the window.  Every line numbered, the ruler at 80 columns from
+    # where the text begins, and the long line cut at the edge, a $ there,
+    # rather than carried on into the rows below.
+    long="$SANDBOX/grid/readings.xyz"
+    {
+        printf 'first\n'
+        i=0
+        while [ "$i" -lt 200 ]; do printf x; i=$((i + 1)); done
+        printf '\nthird\n'
+    } > "$long"
+    if ! grid_start "$long" 8 '(setq mega-trust-ask-on-open nil mega-blame nil)' ||
+        ! grid_wait 'readings.xyz' 150; then
+        bad "terminal  on the grid of $version: Emacs did not come up on a file"
+        grid kill-server 2>/dev/null
+        return
+    fi
+    bar=$(printf '\342\224\202')
+    rows=$(grid capture-pane -p -t grid | sed -n 1,3p | sed "s/$bar/|/g")
+    grid kill-server 2>/dev/null
+    one=$(printf '%s\n' "$rows" | sed -n 1p)
+    two=$(printf '%s\n' "$rows" | sed -n 2p)
+    three=$(printf '%s\n' "$rows" | sed -n 3p)
+    before_text=${one%%first*}
+    before_ruler=${one%%|*}
+    case "$one/$two/$three" in
+        *"1 first"*"|"*/*"2 xxx"*'$'/*"3 third"*"|"*)
+            if [ $((${#before_ruler} - ${#before_text})) -eq 80 ]; then
+                ok "terminal  on the grid of $version: any file is numbered, ruled at 80, and its long lines are not wrapped"
+            else
+                bad "terminal  on the grid of $version: the ruler is at column $((${#before_ruler} - ${#before_text})) of the text"
+                printf '%s\n' "$rows" | cut -c1-200 | detail
+            fi ;;
+        *)
+            bad "terminal  on the grid of $version: a file is not numbered, ruled and unwrapped"
+            printf '%s\n' "$rows" | cut -c1-200 | detail ;;
+    esac
+
     # Two: a line with such a sequence in it, and a note that comes to the
     # end of a line and goes again.  Afterwards every line on the screen is
     # the line of the buffer: nothing missing, nothing from another line.
@@ -849,9 +887,11 @@ ${line%%:*}: the cursor is on '${at#* }'"
     fi
     grid send-keys -t grid C-n
     grid_wait 'third line   Ada, just now' 100
-    # Without what stands to the right of a line: blanks, and the ruler.
+    # Without what stands beside a line: its number on the left, blanks and
+    # the ruler on the right.
     ruler=$(printf '\342\224\202')
-    shown=$(grid capture-pane -p -t grid | sed -n 1,3p | sed "s/[ $ruler]*\$//")
+    shown=$(grid capture-pane -p -t grid | sed -n 1,3p |
+                sed "s/^ *[0-9][0-9]* //; s/[ $ruler]*\$//")
     grid kill-server 2>/dev/null
     # The skulls without their selectors: that is how they are sent.
     wanted=$(printf 'first line\nx\342\230\240\342\230\240\342\230\240 DANGER ZONE the end\nthird line   Ada, just now')

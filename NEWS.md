@@ -5,6 +5,19 @@ goes up with a round of work that adds or changes what MEGA does, PATCH with
 one that only mends, and MAJOR stays 2 until MEGA is made over again. Each
 version is tagged in git as `vX.Y.Z`.
 
+## 2.2.0 — 2026-10-21
+
+- Every file shows its line numbers and the ruler, whatever kind of file it
+  is; before, line numbers were for code, and the ruler for code,
+  configuration and prose.
+- The ruler stands at 80 columns, or where a project's `.editorconfig` puts
+  it.
+- Long lines are not wrapped: a line too long for its window runs off the
+  right edge, marked with a `$`, and the window scrolls sideways to follow
+  the cursor, as does a sideways tilt of the wheel.
+- `mega-line-numbers`, `mega-ruler` and `mega-wrap-lines` in `local.el`
+  change each of these; `local.el.example` has them.
+
 ## 2.1.0 — 2026-10-21
 
 The first rounds of use.

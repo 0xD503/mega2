@@ -164,7 +164,8 @@ Examples of that ordering already decided:
 
 LSP through eglot (completion, diagnostics, hover, navigation, rename, code
 actions, hierarchies, semantic highlighting); tree-sitter modes through
-Emacs's own prompt; a vertical minibuffer with `flex` matching; the ruler;
+Emacs's own prompt; a vertical minibuffer with `flex` matching; line numbers
+and the ruler in every file, and long lines left unwrapped;
 a file tree (speedbar in a side window); imenu; diagnostics list; folding;
 which-key; editorconfig; tabs; history, recent files and places; TRAMP;
 project shell; editable grep results; GUD debuggers (gdb, lldb, pdb).

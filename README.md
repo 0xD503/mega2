@@ -287,6 +287,14 @@ the like. To change a setting, uncomment its lines (select them, `C-c C-c`)
 and change the value. A test holds the template to MEGA, so it is never out
 of date.
 
+Every file shows its line numbers and the ruler, whatever kind of file it
+is; the ruler stands at 80 columns, or where a project's `.editorconfig`
+puts it. A line too long for its window is not wrapped: it runs off the
+right edge, marked with a `$`, and the window scrolls sideways to follow the
+cursor. `mega-line-numbers`, `mega-ruler` and `mega-wrap-lines` in
+`local.el` change that; `M-x visual-line-mode` wraps one buffer at the ends
+of words.
+
 There are three themes. `mega-ayu`, the one MEGA starts with, is Ayu Dark,
 as Zed has it: blue-black, keywords orange, functions yellow.
 `mega-hacker` is green on black, after the old screens: a background that is

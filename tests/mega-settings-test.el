@@ -132,6 +132,9 @@ is loaded."
            (should (memq (cadr (cadr form))
                          (mapcar (lambda (spec) (if (consp spec) (car spec) spec))
                                  mega-modules))))
+          ('add-hook
+           ;; A hook of Emacs's own, there before local.el.
+           (should (string-suffix-p "-hook" (symbol-name (cadr (cadr form))))))
           ('add-to-list
            ;; Defined by early-init.el, which loads before local.el.
            (should (memq (cadr (cadr form)) '(mega-private-file-regexps
@@ -172,7 +175,12 @@ is loaded."
                                     :fill-column (default-value 'fill-column)
                                     :tab-width (default-value 'tab-width)
                                     :vault (and (member "/vault/" mega-private-file-regexps) t)
-                                    :ruler (memq 'mega-ui-ruler text-mode-hook)
+                                    :prose (with-temp-buffer
+                                             (text-mode)
+                                             (list (and visual-line-mode t) truncate-lines))
+                                    :code (with-temp-buffer
+                                            (prog-mode)
+                                            (list (and visual-line-mode t) truncate-lines))
                                     :key (lookup-key mega-keys-mode-map (kbd "C-c w"))
                                     :gone (lookup-key mega-keys-mode-map (kbd "C-c D"))
                                     :theme custom-enabled-themes))))
@@ -187,7 +195,9 @@ is loaded."
         (should (= (plist-get ran :fill-column) 100))
         (should (= (plist-get ran :tab-width) 8))
         (should (plist-get ran :vault))
-        (should-not (plist-get ran :ruler))
+        ;; Prose wraps at the ends of words; code still does not wrap.
+        (should (equal (plist-get ran :prose) '(t nil)))
+        (should (equal (plist-get ran :code) '(nil t)))
         (should (eq (plist-get ran :key) 'whitespace-mode))
         (should-not (plist-get ran :gone))
         ;; And the settings, each set to what it is anyway.

@@ -130,25 +130,62 @@ the one MEGA starts with unasked is on, and what was asked for is said."
 
 (column-number-mode 1)
 
-;;;; Line numbers and the ruler
+;;;; Line numbers, the ruler, and long lines
+;;
+;; Every file shows its line numbers and the ruler, whatever kind of file it
+;; is, and a line too long for its window stays one line: it runs off the
+;; right edge, a `$' there says so, and the window scrolls sideways to keep
+;; the cursor in sight.  So do buffers of code, configuration and prose that
+;; are not a file yet.  Not a buffer that is not text to edit, such as the
+;; home page, a listing or a picture; nor a file `so-long' has taken over,
+;; where the point is to do less.
 ;;
 ;; The ruler is a vertical line at the line-length limit.  That limit is
 ;; `fill-column': 80 unless the project's .editorconfig sets
 ;; `max_line_length', in which case the ruler moves with it.
 
-(defun mega-ui-line-numbers ()
-  "Show line numbers in this buffer."
-  (display-line-numbers-mode 1))
+(defcustom mega-line-numbers t
+  "Non-nil to show line numbers in every file."
+  :type 'boolean
+  :group 'mega)
 
-(defun mega-ui-ruler ()
-  "Show the ruler at `fill-column' in this buffer."
-  (display-fill-column-indicator-mode 1))
+(defcustom mega-ruler t
+  "Non-nil to show the ruler in every file, at `fill-column'.
+That is 80 unless set otherwise, here or by a project's .editorconfig."
+  :type 'boolean
+  :group 'mega)
+
+(defcustom mega-wrap-lines nil
+  "Non-nil to wrap a line too long for its window onto the next screen line.
+Nil keeps it one line: it runs off the right edge, marked there with a
+`$', and the window scrolls sideways to follow the cursor.  A buffer in
+`visual-line-mode' wraps at the ends of words either way."
+  :type 'boolean
+  :group 'mega)
+
+(defun mega-ui--text-p ()
+  "Non-nil if the current buffer is text to edit, which these are for."
+  (not (or (minibufferp)
+           (derived-mode-p 'special-mode 'image-mode 'doc-view-mode
+                           'archive-mode 'tar-mode 'hexl-mode 'so-long-mode)
+           (bound-and-true-p so-long-minor-mode))))
+
+(defun mega-ui-lines ()
+  "Line numbers, the ruler and long lines, as the settings have them."
+  (when (mega-ui--text-p)
+    (when mega-line-numbers
+      (display-line-numbers-mode 1))
+    (when mega-ruler
+      (display-fill-column-indicator-mode 1))
+    (unless (or mega-wrap-lines (bound-and-true-p visual-line-mode))
+      (setq truncate-lines t))))
 
 (setq display-line-numbers-width-start t)
 
-(add-hook 'prog-mode-hook #'mega-ui-line-numbers)
+;; A file of any kind, and the buffers of text that are not a file yet.
+(add-hook 'find-file-hook #'mega-ui-lines)
 (dolist (hook '(prog-mode-hook conf-mode-hook text-mode-hook))
-  (add-hook hook #'mega-ui-ruler))
+  (add-hook hook #'mega-ui-lines))
 
 ;;;; Parentheses
 
@@ -291,9 +328,12 @@ Under tmux the mouse reaches Emacs only if tmux has `mouse on'."
 
 (defvar mouse-wheel-progressive-speed)
 (defvar mouse-wheel-scroll-amount)
+(defvar mouse-wheel-tilt-scroll)
 
 (setq mouse-wheel-progressive-speed nil   ; a notch is always the same distance
-      mouse-wheel-scroll-amount '(3 ((shift) . 1)))
+      mouse-wheel-scroll-amount '(3 ((shift) . 1))
+      ;; Sideways, for lines longer than the window: see `mega-wrap-lines'.
+      mouse-wheel-tilt-scroll t)
 
 (defun mega-ui-mouse ()
   "Switch the mouse on in a terminal, if `mega-mouse' says so."
