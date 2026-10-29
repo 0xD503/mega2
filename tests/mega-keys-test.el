@@ -45,7 +45,7 @@ inside belongs to whoever owns that keymap."
     (should (cdr group)))
   (dolist (row (mega-keys-test--rows))
     (should (memq (length row) '(3 4)))
-    (should (memq (nth 3 row) '(nil :code :text)))
+    (should (memq (nth 3 row) '(nil :code :text :unclaimed)))
     (should (or (null (car row)) (stringp (car row))))
     (should (symbolp (nth 1 row)))
     (should (stringp (nth 2 row)))
@@ -89,6 +89,41 @@ inside belongs to whoever owns that keymap."
                                        (insert (symbol-name (key-binding (kbd "M-n")))))))
                   (intern (read-string "x: "))))
               'next-history-element)))
+
+(ert-deftest mega-keys-c-a-leaves-a-mode-its-own ()
+  "C-a is MEGA's wherever the mode has nothing of its own there."
+  (dolist (mode '(fundamental-mode prog-mode text-mode special-mode))
+    (with-temp-buffer
+      (funcall mode)
+      (should (eq (key-binding (kbd "C-a")) #'mega-beginning-of-line))))
+  ;; A mode that binds the key, as a terminal does to pass it to the shell.
+  (with-temp-buffer
+    (use-local-map (let ((map (make-sparse-keymap)))
+                     (define-key map (kbd "C-a") #'ignore)
+                     map))
+    (should (eq (key-binding (kbd "C-a")) #'ignore)))
+  ;; A mode that puts its own command in place of Emacs's, as Org does.
+  (with-temp-buffer
+    (use-local-map (let ((map (make-sparse-keymap)))
+                     (define-key map [remap move-beginning-of-line] #'ignore)
+                     map))
+    (should (eq (key-binding (kbd "C-a")) #'ignore)))
+  ;; At a prompt: the text typed, then its start, never into the prompt.
+  ;; C-o notes where each C-a left the cursor, counted from where the
+  ;; input starts; nothing here can fail and leave the prompt waiting.
+  (let (seen)
+    (ert-simulate-keys (kbd "C-e C-a C-o C-a C-o C-a C-o RET")
+      (minibuffer-with-setup-hook
+          (lambda ()
+            (use-local-map
+             (let ((map (make-sparse-keymap)))
+               (set-keymap-parent map (current-local-map))
+               (define-key map (kbd "C-o")
+                           (lambda () (interactive)
+                             (push (- (point) (minibuffer-prompt-end)) seen)))
+               map)))
+        (read-string "x: " "  foo")))
+    (should (equal (nreverse seen) '(2 0 2)))))
 
 (ert-deftest mega-keys-nothing-is-bound-that-the-table-does-not-list ()
   (let ((table (delq nil (mapcar (lambda (row)

@@ -5,6 +5,14 @@ goes up with a round of work that adds or changes what MEGA does, PATCH with
 one that only mends, and MAJOR stays 2 until MEGA is made over again. Each
 version is tagged in git as `vX.Y.Z`.
 
+## 2.3.0 — 2026-10-28
+
+- `C-a` goes to the first character of the line that is not a space or a
+  tab; pressed again, to the start of the line, and so back and forth.
+  Where a wrapped line continues, the start of the screen line comes first.
+  At a prompt it stops at what was typed, not in the prompt.
+- A mode that has its own `C-a`, as Org, mail and a terminal do, keeps it.
+
 ## 2.2.0 — 2026-10-21
 
 - Every file shows its line numbers and the ruler, whatever kind of file it

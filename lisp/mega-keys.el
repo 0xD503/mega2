@@ -20,11 +20,13 @@
 ;; WHERE, when given, limits a key to buffers where it makes sense, leaving
 ;; what Emacs had there alone everywhere else:
 ;;
-;;   :code   buffers of source code and configuration files
-;;   :text   those, and prose
+;;   :code       buffers of source code and configuration files
+;;   :text       those, and prose
+;;   :unclaimed  any buffer whose mode has nothing of its own on the key
 ;;
 ;; That is what keeps `M-n' meaning "next in history" at a prompt and "next
-;; error" in a compilation buffer.
+;; error" in a compilation buffer, and `C-a' going to the shell in a
+;; terminal, and to Org's own start of the line in Org.
 ;;
 ;; Keys of your own go in the same table, so that the cheat sheet shows them.
 ;; In local.el, which loads before this file:
@@ -62,6 +64,8 @@
      ("C-c C-v" mega-major-mode-ctrl-c-ctrl-c "What this mode itself has on C-c C-c" :code)
      ("M-n"     mega-symbol-next     "Next occurrence of the symbol at point" :text)
      ("M-p"     mega-symbol-previous "Previous occurrence of the symbol at point" :text)
+     ("C-a"     mega-beginning-of-line "First non-blank character of the line; again, its start"
+      :unclaimed)
      ("C-c s"   mega-snippet-insert  "Insert a snippet")
      ("C-c f"   mega-fold-toggle     "Fold or unfold the block the cursor is in" :code)
      ("C-c F"   mega-fold-all        "Fold every block, or unfold everything" :code)
@@ -203,21 +207,35 @@ is what the cheat sheet shows; ALSO lists further keys for the same
 command that are not worth a reader's time, such as the name a
 graphical frame has for TAB.")
 
-(defun mega-keys--applies-p (where)
-  "Non-nil if a key limited to WHERE applies in the current buffer."
+(defun mega-keys--unclaimed-p (key)
+  "Non-nil if the mode of the current buffer has nothing of its own on KEY.
+It has when its keymap binds KEY, as a terminal does to pass every key
+to the shell, or puts another command in place of the one KEY has
+everywhere, as Org does for `C-a'."
+  (let ((local (current-local-map))
+        (global (lookup-key global-map key)))
+    (not (and local
+              (or (commandp (lookup-key local key))
+                  (and global (symbolp global)
+                       (command-remapping global nil (list local))))))))
+
+(defun mega-keys--applies-p (where key)
+  "Non-nil if KEY, limited to WHERE, applies in the current buffer."
   (pcase where
     (:code (derived-mode-p 'prog-mode 'conf-mode))
     (:text (derived-mode-p 'prog-mode 'conf-mode 'text-mode))
+    (:unclaimed (mega-keys--unclaimed-p key))
     (_ t)))
 
 (defun mega-keys--binding (row)
   "What ROW's key is bound to: its command, limited to where it applies."
   (let ((command (nth 1 row))
-        (where (nth 3 row)))
+        (where (nth 3 row))
+        (key (and (car row) (kbd (car row)))))
     (if where
         `(menu-item "" ,command
                     :filter ,(lambda (command)
-                               (and (mega-keys--applies-p where) command)))
+                               (and (mega-keys--applies-p where key) command)))
       command)))
 
 (defvar mega-keys-mode-map
@@ -272,7 +290,7 @@ and loses its old row, so the cheat sheet stays true."
     (unless (and (or (null (car row)) (stringp (car row)))
                  (symbolp (nth 1 row))
                  (stringp (nth 2 row))
-                 (memq (nth 3 row) '(nil :code :text)))
+                 (memq (nth 3 row) '(nil :code :text :unclaimed)))
       (error "Not a row of `mega-keys': %S" row))
     (when (car row)
       (mega-keys-remove (car row))

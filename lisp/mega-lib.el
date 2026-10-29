@@ -24,7 +24,7 @@
 
 ;;; Code:
 
-(defconst mega-version "2.2.0"
+(defconst mega-version "2.3.0"
   "The MEGA version: MAJOR.MINOR.PATCH.
 MINOR goes up with a round of work that adds or changes what MEGA does,
 PATCH with one that only mends; MAJOR stays 2 until MEGA is made over

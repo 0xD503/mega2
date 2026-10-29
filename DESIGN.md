@@ -189,7 +189,7 @@ project shell; editable grep results; GUD debuggers (gdb, lldb, pdb).
 | Debugging | Picks the debugger and the program for the project; one set of keys for gdb, lldb and pdb. On the host through GUD, in a container through a debug adapter |
 | Debug adapter client | Own client for the Debug Adapter Protocol: breakpoints that outlive sessions, stack, variables, output |
 | Workspaces | The open files and the window layout, saved under a name and resumed |
-| Small helpers | Indent guides, TODO highlight, symbol jump, trim changed lines, clipboard bridge |
+| Small helpers | Indent guides, TODO highlight, symbol jump, `C-a` to the text of the line and then its start, trim changed lines, clipboard bridge |
 | Which block you are in | A line above the text names the lines that open the blocks around the cursor, once they are out of sight, and goes away when they are not. From indentation alone: the nearest line above that is indented less, and so on outward. Comments, the inside of strings, and in C the preprocessor and labels are passed over; a line that only closes a list of arguments gives way to the line that began it |
 | Who changed this line | At the end of the line the cursor rests on: who, how long ago, in which change. git is asked about that one line when Emacs is idle, in the background, about the text on screen whether saved or not, and with `--no-textconv`, without which it runs a converter the repository can name |
 | Modes | Markdown, Zig, justfile, Rust fallback |
@@ -258,7 +258,11 @@ its top is what Emacs is pointed at.
   dropped at start-up. The keys of the places that have their own (the
   completion menu, the undo tree, the home page) are described in
   `mega-keys-elsewhere`, and a test holds that description to the keymaps,
-  key by key, in both directions.
+  key by key, in both directions. A row can limit its key to code, to code
+  and prose, or to buffers whose mode has nothing of its own on the key
+  (`:unclaimed`): that is how `C-a` goes to the text of the line in every
+  buffer but those of Org, mail and a terminal, which have a `C-a` of their
+  own and keep it.
 - **Logic separate from display.** Popup, picker, completion menu and undo
   tree keep a model apart from the code that draws it, so the model is
   unit-testable without a terminal.

@@ -126,6 +126,74 @@
     (insert "   ")
     (should-error (mega-symbol-next) :type 'user-error)))
 
+;;;; The start of the line
+
+(ert-deftest mega-edit-c-a-goes-back-and-forth-between-text-and-the-start ()
+  (with-temp-buffer
+    (insert "    (foo bar)\n")
+    (goto-char (point-min))
+    (move-to-column 9)
+    (mega-beginning-of-line)
+    (should (= (current-column) 4))
+    (mega-beginning-of-line)
+    (should (= (current-column) 0))
+    (mega-beginning-of-line)
+    (should (= (current-column) 4))
+    ;; From inside the indentation, the text comes first too.
+    (move-to-column 2)
+    (mega-beginning-of-line)
+    (should (= (current-column) 4))))
+
+(ert-deftest mega-edit-c-a-on-lines-of-other-shapes ()
+  (with-temp-buffer
+    (insert "\t\tx = 1\nflush\n   \n")
+    (goto-char (point-max))
+    (forward-line -3)
+    (end-of-line)
+    (mega-beginning-of-line)
+    (should (looking-at-p "x = 1"))
+    ;; A line that is not indented has one place to go.
+    (forward-line 1)
+    (end-of-line)
+    (mega-beginning-of-line)
+    (should (bolp))
+    (mega-beginning-of-line)
+    (should (bolp))
+    ;; A line of blanks: their end, then the start.
+    (forward-line 1)
+    (mega-beginning-of-line)
+    (should (eolp))
+    (mega-beginning-of-line)
+    (should (bolp))))
+
+(ert-deftest mega-edit-c-a-with-a-count-goes-down-first ()
+  (with-temp-buffer
+    (insert "one\n  two\n    three\n")
+    (goto-char (point-min))
+    (mega-beginning-of-line 3)
+    (should (looking-at-p "three"))))
+
+(ert-deftest mega-edit-c-a-selects-with-shift ()
+  (should (string-prefix-p "^" (cadr (interactive-form #'mega-beginning-of-line)))))
+
+(ert-deftest mega-edit-c-a-stops-where-a-wrapped-line-continues ()
+  (let ((buffer (generate-new-buffer "mega-edit-wrapped")))
+    (unwind-protect
+        (save-window-excursion
+          (switch-to-buffer buffer)
+          (insert "  " (mapconcat #'identity (make-list 60 "word") " "))
+          (visual-line-mode 1)
+          (goto-char (point-max))
+          (let ((screen (save-excursion (beginning-of-visual-line) (point))))
+            (should (> screen 3))
+            (mega-beginning-of-line)
+            (should (= (point) screen)))
+          (mega-beginning-of-line)
+          (should (= (current-column) 2))
+          (mega-beginning-of-line)
+          (should (bolp)))
+      (kill-buffer buffer))))
+
 ;;;; Trailing whitespace
 
 (ert-deftest mega-edit-saving-trims-only-the-lines-that-were-changed ()

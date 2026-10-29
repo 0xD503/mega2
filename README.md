@@ -125,7 +125,9 @@ lists what can follow.
 
 In code, `C-c C-c` comments or uncomments, `C-c f` folds the block the cursor
 is in (`C-c F`: all of them), and `M-n` / `M-p` jump between the uses of the
-symbol at point.
+symbol at point. Anywhere, `C-a` goes to the first character of the line that
+is not blank, and pressed again to the start of the line; a mode that has a
+`C-a` of its own, as Org and a terminal do, keeps it.
 
 **Which block you are in.** When the line that opens the function, class or
 block around the cursor has scrolled off the top, a line above the text

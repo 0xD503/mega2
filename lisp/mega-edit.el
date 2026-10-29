@@ -7,6 +7,7 @@
 ;;   C-c C-c     comment or uncomment the region, or the line
 ;;   C-c C-v     what the major mode itself has on C-c C-c
 ;;   M-n / M-p   next / previous occurrence of the symbol at point
+;;   C-a         the first non-blank character of the line; again, its start
 ;;
 ;; Without asking, MEGA also: closes brackets and quotes as you type them;
 ;; replaces the selection when you type over it; highlights TODO, FIXME and
@@ -87,6 +88,30 @@ what the mode had there, such as sending a buffer to an interpreter."
   "Go to the previous occurrence of the symbol at point."
   (interactive)
   (mega-symbol--jump t))
+
+;;;; The start of the line
+
+(defun mega-beginning-of-line (&optional n)
+  "Go to the first character of the line that is not a space or a tab.
+If the cursor is there already, go to the start of the line instead,
+so that pressing the key again goes back and forth between the two.
+Where `visual-line-mode' wraps a line, the start of the screen line
+comes first, for a continuation has no indentation of its own.
+With N, go N - 1 lines down first, as `move-beginning-of-line' does."
+  (interactive "^p")
+  (setq n (or n 1))
+  (unless (= n 1)
+    (forward-line (1- n)))
+  (let ((here (point))
+        (text (save-excursion (back-to-indentation) (point)))
+        (screen (and (bound-and-true-p visual-line-mode)
+                     (save-excursion (beginning-of-visual-line) (point)))))
+    (cond ((and screen (> screen text) (/= here screen))
+           (goto-char screen))
+          ((/= here text)
+           (goto-char text))
+          (t
+           (move-beginning-of-line 1)))))
 
 ;;;; Trailing whitespace, on the lines you changed
 
