@@ -1,9 +1,18 @@
 # What changed in MEGA
 
 One entry per version, newest first. A version is MAJOR.MINOR.PATCH: MINOR
-goes up with a round of work that adds or changes what MEGA does, PATCH with
-one that only mends, and MAJOR stays 2 until MEGA is made over again. Each
-version is tagged in git as `vX.Y.Z`.
+goes up when it adds or changes what MEGA does, PATCH when it only mends,
+and MAJOR stays 2 until MEGA is made over again. What is done meanwhile is
+under "Not yet released" until there is enough of it for a version, which
+is then tagged in git as `vX.Y.Z`.
+
+## Not yet released
+
+- In the search prompt, what you type or delete is on the screen at once,
+  while the search is still at work. In a tree as large as Linux a search
+  takes seconds, and `M-Backspace` left the word in sight until it was done.
+- The tests no longer reach your desktop: a test that killed text in a
+  terminal Emacs gave it to your clipboard, in place of what you had copied.
 
 ## 2.4.0 — 2026-10-28
 

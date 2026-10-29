@@ -398,6 +398,12 @@ indented with tabs, a new line began with four spaces."
 
 ;;;; Clipboard
 
+(ert-deftest mega-clipboard-the-tests-cannot-reach-yours ()
+  "A test that kills text gave it to the clipboard of whoever ran the tests."
+  (dolist (name '("DISPLAY" "WAYLAND_DISPLAY"))
+    (should-not (getenv name)))
+  (should-not (mega-clipboard--tool)))
+
 (ert-deftest mega-clipboard-picks-the-tool-of-the-session ()
   (cl-letf (((symbol-function 'mega-exe-p) (lambda (name) (concat "/bin/" name))))
     (let ((process-environment '("WAYLAND_DISPLAY=wayland-0" "DISPLAY=:0")))

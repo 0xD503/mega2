@@ -131,6 +131,11 @@ MEGA_TEST_CONFIG=$CONFIG
 export HOME XDG_CACHE_HOME XDG_STATE_HOME XDG_DATA_HOME XDG_CONFIG_HOME TMPDIR
 export MEGA_TEST_SANDBOX MEGA_TEST_CONFIG
 
+# Nor does a test reach your desktop.  An Emacs in a terminal gives what is
+# killed to the system clipboard when it can find one, and tests kill text:
+# with these, it went to yours, in place of what you had copied.
+unset DISPLAY WAYLAND_DISPLAY XAUTHORITY
+
 failed=0
 skipped=0
 
@@ -902,6 +907,41 @@ ${line%%:*}: the cursor is on '${at#* }'"
             bad "terminal  on the grid of $version: the screen does not hold the buffer's lines"
             printf '%s\n' "$shown" | cut -c1-200 | detail ;;
     esac
+
+    # Five: at a prompt whose choices come from a program, what is typed or
+    # deleted is on the screen at once, while the program is still at work.
+    # Asked for after use: in a tree as large as Linux a search takes
+    # seconds, and a word deleted stayed in sight until it was done.  This
+    # program takes four seconds; the word has a second and a half to go.
+    slow_prompt='(progn (setq mega-trust-ask-on-open nil mega-blame nil) (require (quote mega-pick)) (run-at-time 1 nil (lambda () (mega-pick-read \"Slow: \" (lambda (input) (mega-exec-run \"sleep\" (list \"4\") :here t) (list (concat \"hit \" input)))))))'
+    if ! grid_start "$repo/notes.txt" 12 "$slow_prompt" || ! grid_wait 'Slow: ' 150; then
+        bad "terminal  on the grid of $version: a prompt fed by a program did not open"
+        grid capture-pane -p -t grid 2>/dev/null | cut -c1-200 | detail
+        grid kill-server 2>/dev/null
+        return
+    fi
+    grid send-keys -t grid -l 'abc def'
+    if ! grid_wait 'hit abc def' 150; then
+        bad "terminal  on the grid of $version: a prompt fed by a program did not list what it said"
+        grid capture-pane -p -t grid | cut -c1-200 | detail
+        grid kill-server 2>/dev/null
+        return
+    fi
+    grid send-keys -t grid M-BSpace
+    tries=0
+    while [ "$tries" -lt 15 ]; do
+        line=$(grid capture-pane -p -t grid | grep -F 'Slow: ')
+        case $line in *'Slow: abc'*) case $line in *def*) ;; *) break ;; esac ;; esac
+        tries=$((tries + 1))
+        sleep 0.1
+    done
+    grid kill-server 2>/dev/null
+    if [ "$tries" -lt 15 ]; then
+        ok "terminal  on the grid of $version: a word deleted at a prompt is gone from the screen while its program works"
+    else
+        bad "terminal  on the grid of $version: a word deleted at a prompt stayed on the screen until its program was done"
+        printf '%s\n' "$line" | cut -c1-200 | detail
+    fi
 }
 
 # --- run --------------------------------------------------------------------

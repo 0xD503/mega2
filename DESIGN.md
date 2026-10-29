@@ -452,6 +452,15 @@ Things learned while building it, worth keeping in mind:
   test scans MEGA's source for plain `setq` on such variables.
 - Emacs makes no backups under the temporary directory, which is where the
   sandbox lives; tests that need one lift that rule explicitly.
+- A sandbox for files is not one for the desktop. An Emacs in a terminal
+  hands what is killed to the system clipboard when DISPLAY or
+  WAYLAND_DISPLAY lets it find one, and the terminal stage kills text:
+  until run.sh unset them, each run put words of the tests in the
+  clipboard of whoever ran it.
+- icomplete works the list out before it redraws once the input is longer
+  than `icomplete-max-delay-chars`, which suits choices that are known. A
+  prompt fed by a program waits instead, so an edit shows before a search
+  of seconds; the terminal stage holds it to that.
 - In batch mode an error in a process sentinel ends Emacs, and with it the
   whole test run, silently. Code that runs in a sentinel catches its errors.
 - ERT runs tests with `debug-on-error` on, which lets errors through

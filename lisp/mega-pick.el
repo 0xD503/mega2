@@ -27,6 +27,7 @@
 (require 'mega-lib)
 
 (defvar completion-all-sorted-completions)
+(defvar icomplete-max-delay-chars)
 
 ;;;; The pass-through completion style
 
@@ -181,6 +182,13 @@ Returns the chosen string, or the typed input if nothing matched."
                                            (and selected mega-pick-selected-map)
                                            mega-pick-typing-map))
                            (current-local-map)))
+           ;; The list waits a moment before it is worked out, and the
+           ;; screen is drawn meanwhile: what was typed or deleted shows at
+           ;; once, and a key pressed in that moment saves the work.  The
+           ;; list skips the wait once the input is a few characters long,
+           ;; which suits choices that are known; these come from a program,
+           ;; and in a tree as large as Linux a search may take seconds.
+           (setq-local icomplete-max-delay-chars most-positive-fixnum)
            (when selected
              (mega-pick--select-input))))
       (completing-read prompt (car table+forget) nil nil
