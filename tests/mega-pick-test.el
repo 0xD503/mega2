@@ -172,6 +172,46 @@ that must not mean searching for the hit itself."
       (mega-pick-read "Say: " #'ignore :keymap map))
     (should ran)))
 
+(ert-deftest mega-pick-space-and-question-mark-are-typed ()
+  "What is typed is a query for a program, a regexp often: SPC and ?
+are characters of it, not completion of a word and a list of choices."
+  (let ((typed (lambda (keys &rest options)
+                 (ert-simulate-keys (kbd keys)
+                   (apply #'mega-pick-read "Say: " #'ignore options)))))
+    (should (equal (funcall typed "f o o SPC b a r ? \\ SPC x RET")
+                   "foo bar?\\ x"))
+    ;; Over a selected start, as `M-g a' offers the word at point, a space
+    ;; takes its place like any other character.
+    (should (equal (funcall typed "SPC a RET" :initial "word" :selected t)
+                   " a"))))
+
+(ert-deftest mega-pick-tab-completes-nothing-and-signals-nothing ()
+  "The style's try function keeps to what Emacs expects of one: nil, t,
+or (STRING . POINT); a bare string broke every key that completes."
+  (let* ((table (car (mega-pick-table (lambda (_) '("src/a.rs:3:hit")) 'hit)))
+         (completion-category-overrides '((hit (styles mega-pick-all)))))
+    (should (equal (completion-try-completion "hi" table nil 1) '("hi" . 1))))
+  ;; In a prompt with choices on offer: what SPC, ? and TAB do there.  C-o
+  ;; r looks, and catches what TAB signals, so that nothing can stop the
+  ;; keys short and leave the prompt waiting.
+  (let* ((seen nil)
+         (map (let ((m (make-sparse-keymap)))
+                (define-key m (kbd "C-o r")
+                            (lambda () (interactive)
+                              (push (key-binding (kbd "SPC")) seen)
+                              (push (key-binding (kbd "?")) seen)
+                              (push (condition-case err
+                                        (progn (call-interactively
+                                                (key-binding (kbd "TAB")))
+                                               (minibuffer-contents))
+                                      (error err))
+                                    seen)))
+                m)))
+    (ert-simulate-keys (kbd "a b C-o r RET")
+      (mega-pick-read "Say: " (lambda (_) '("abc:1:x" "abd:2:y")) :keymap map))
+    (should (equal (nreverse seen)
+                   '(self-insert-command self-insert-command "ab")))))
+
 ;;;; A page at a time
 
 (ert-deftest mega-minibuffer-a-page-is-what-the-prompt-shows-less-one ()

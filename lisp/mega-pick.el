@@ -30,10 +30,12 @@
 
 ;;;; The pass-through completion style
 
-(defun mega-pick--try (string table predicate _point)
+(defun mega-pick--try (string table predicate point)
   "Completion style function: STRING is as complete as it gets.
-TABLE and PREDICATE only decide whether there is anything to offer."
-  (and (all-completions string table predicate) string))
+TABLE and PREDICATE only decide whether there is anything to offer.
+The answer is the one of a style that leaves STRING and POINT as they
+are, (STRING . POINT): a bare string is not one Emacs understands."
+  (and (all-completions string table predicate) (cons string point)))
 
 (defun mega-pick--all (string table predicate _point)
   "Completion style function: everything TABLE offers for STRING, unfiltered.
@@ -122,6 +124,16 @@ Outside a prompt this does nothing."
     map)
   "Keys of a prompt whose text to start with is selected.")
 
+(defvar mega-pick-typing-map
+  (let ((map (make-sparse-keymap)))
+    ;; A prompt that completes takes SPC to complete a word and ? to list
+    ;; the choices.  Here what is typed is a query, a regexp often, and
+    ;; both are characters of it.
+    (define-key map (kbd "SPC") #'self-insert-command)
+    (define-key map (kbd "?") #'self-insert-command)
+    map)
+  "Keys of every pick prompt: those that type what a query is made of.")
+
 (defun mega-pick--select-input ()
   "Select what the prompt holds, as a selection made with the shift key is.
 What is typed takes its place, and the first key that moves the cursor
@@ -164,11 +176,11 @@ Returns the chosen string, or the typed input if nothing matched."
         ;; keys in front of what it finds, and these go in front of those.
         (:append
          (lambda ()
-           (when (or keymap selected)
-             (use-local-map (make-composed-keymap
-                             (delq nil (list keymap
-                                             (and selected mega-pick-selected-map)))
-                             (current-local-map))))
+           (use-local-map (make-composed-keymap
+                           (delq nil (list keymap
+                                           (and selected mega-pick-selected-map)
+                                           mega-pick-typing-map))
+                           (current-local-map)))
            (when selected
              (mega-pick--select-input))))
       (completing-read prompt (car table+forget) nil nil

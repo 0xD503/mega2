@@ -3,6 +3,10 @@
 ;;; Code:
 
 (require 'mega-test-helper)
+(require 'text-property-search)
+(require 'compile)
+(require 'shell)
+(require 'eshell)
 
 (defvar mega-test-pwned)
 (defvar compilation-read-command)
@@ -255,6 +259,82 @@ Emacs runs git on opening a file; git must not obey that config."
       (mega-test-visiting buffer file
         (should (= fill-column 100))
         (should indent-tabs-mode)))))
+
+;;;; What programs print: colours and links
+
+(defvar explicit-sh-args)
+
+(defconst mega-core-test--printed
+  (concat
+   ;; A link ended by a bell, as `ls --hyperlink' ends one, in a colour.
+   "printf 'see \\033[31m\\033]8;;https://example.com/x\\aTHE-LINK\\033]8;;\\a\\033[0m"
+   ;; And a word that the current directory is another.
+   "\\033]7;file://localhost/\\a end\\n'")
+  "A shell command that prints a link and a change of directory.")
+
+(defun mega-core-test--links-made (&optional where)
+  "Check the current buffer: a button for the link, and no escape codes.
+WHERE, when given, is the directory the buffer must still be in."
+  (let ((text (buffer-substring-no-properties (point-min) (point-max)))
+        (link (progn (goto-char (point-min))
+                     (text-property-search-forward
+                      'browse-url-data "https://example.com/x" t))))
+    (should link)
+    (should (equal (buffer-substring-no-properties (prop-match-beginning link)
+                                                   (prop-match-end link))
+                   "THE-LINK"))
+    (should (string-search "see THE-LINK end" text))
+    (should-not (string-search "\e" text))
+    (when where
+      (should (equal default-directory where)))))
+
+(ert-deftest mega-core-a-compilation-shows-links-and-colours ()
+  "Asked for after use.  And only the link is taken: the directory stays."
+  (mega-test-with-directory dir
+    (let* ((default-directory dir)
+           (buffer (compilation-start mega-core-test--printed)))
+      (unwind-protect
+          (with-current-buffer buffer
+            (mega-test-wait-for (lambda () (not (get-buffer-process buffer))))
+            (mega-core-test--links-made dir)
+            ;; The colour is a face now, not a code.  From the end: the
+            ;; first line of the buffer is the command.
+            (goto-char (point-max))
+            (search-backward "THE-LINK")
+            (should (seq-some (lambda (overlay) (overlay-get overlay 'face))
+                              (overlays-at (point)))))
+        (kill-buffer buffer)))))
+
+(ert-deftest mega-core-a-shell-shows-links ()
+  (mega-test-with-directory dir
+    (let* ((default-directory dir)
+           (explicit-shell-file-name "/bin/sh")
+           (explicit-sh-args (list "-c" mega-core-test--printed))
+           (buffer (shell (generate-new-buffer "*mega-shell-links*"))))
+      (unwind-protect
+          (with-current-buffer buffer
+            (mega-test-wait-for (lambda () (not (process-live-p (get-buffer-process buffer)))))
+            (accept-process-output nil 0.1)
+            (mega-core-test--links-made))
+        (let ((kill-buffer-query-functions nil))
+          (kill-buffer buffer))))))
+
+(ert-deftest mega-core-eshell-shows-links-and-stays-where-it-is ()
+  "Eshell takes a bell out of what is printed: the link is read first."
+  (mega-test-with-directory dir
+    (let* ((default-directory dir)
+           (buffer (eshell t)))
+      (unwind-protect
+          (with-current-buffer buffer
+            (goto-char (point-max))
+            ;; `*' runs the program, not a command of Eshell's own.
+            (insert "*" mega-core-test--printed)
+            (eshell-send-input)
+            (mega-test-wait-for (lambda () (not (eshell-interactive-process-p))))
+            (accept-process-output nil 0.1)
+            (mega-core-test--links-made dir))
+        (let ((kill-buffer-query-functions nil))
+          (kill-buffer buffer))))))
 
 (provide 'mega-core-test)
 ;;; mega-core-test.el ends here

@@ -5,6 +5,17 @@ goes up with a round of work that adds or changes what MEGA does, PATCH with
 one that only mends, and MAJOR stays 2 until MEGA is made over again. Each
 version is tagged in git as `vX.Y.Z`.
 
+## 2.4.0 — 2026-10-28
+
+- In the search prompt (`M-g a`) a space can be typed: it is part of the
+  pattern, as is `\ `. Before, the key tried to complete a word and failed
+  with an error. `?` is typed too, instead of listing completions.
+- Links that programs print (OSC 8: `ls --hyperlink`, delta, gcc,
+  ripgrep) are buttons in `M-x shell`, Eshell and the buffer of a task or
+  of `M-x compile`, as they were in `M-x term`. A click opens one, or
+  `C-c RET`. Escape codes are no longer left in the text.
+- The output of `M-x compile` is in colour before the first task too.
+
 ## 2.3.0 — 2026-10-28
 
 - `C-a` goes to the first character of the line that is not a space or a

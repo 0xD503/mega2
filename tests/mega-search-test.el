@@ -1069,6 +1069,22 @@ session starts with."
               (dolist (hit hits)
                 (should-not (string-search "\e" hit))))))))))
 
+(ert-deftest mega-search-a-space-is-a-space-escaped-or-not ()
+  "Asked for after use.  In the regexps of all three programs a space is
+itself, and so is a space after a backslash; two backslashes are one."
+  (skip-unless (executable-find "git"))
+  (mega-search-test--defaults
+    (mega-search-test--with-repository dir
+      (dolist (backend '(git rg grep))
+        (when (executable-find (symbol-name backend))
+          (dolist (case '(("needle here" "tracked.txt:2:a needle here")
+                          ("needle\\ here" "tracked.txt:2:a needle here")
+                          ("needle\\\\ here")))
+            (ert-info ((format "%s searched by %s" (car case) backend))
+              (should (equal (mapcar #'substring-no-properties
+                                     (mega-search-run (car case) dir backend))
+                             (cdr case))))))))))
+
 (ert-deftest mega-search-git-settings-of-yours-do-not-change-what-a-hit-is ()
   "Colours for a hit, names from the top of the checkout, a column number:
 each is a setting somebody has, and each would have a hit read wrongly."

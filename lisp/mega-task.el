@@ -34,7 +34,6 @@
 (defvar compilation-scroll-output)
 (defvar compilation-ask-about-save)
 (defvar compilation-always-kill)
-(defvar compilation-filter-hook)
 
 (defcustom mega-task-overrides nil
   "Tasks you define yourself, per project.
@@ -141,9 +140,7 @@ into one, word by word; nothing in it is interpreted by the shell."
   (setq compilation-scroll-output 'first-error
         ;; Unsaved buffers are offered for saving before a task runs, never
         ;; saved silently and never ignored.
-        compilation-ask-about-save t)
-  ;; Tools colour their output; show the colours, not the escape codes.
-  (add-hook 'compilation-filter-hook #'ansi-color-compilation-filter))
+        compilation-ask-about-save t))
 
 (provide 'mega-task)
 ;;; mega-task.el ends here

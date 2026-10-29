@@ -173,6 +173,58 @@ Settings that are there already are kept."
 
 (editorconfig-mode 1)
 
+;;;; What programs print: colours and links
+;;
+;; Programs colour what they print and, more and more, put links in it
+;; (OSC 8: `ls --hyperlink', delta, gcc, ripgrep).  A terminal buffer,
+;; `M-x term', makes faces and buttons of both by itself; these have the
+;; other places programs print in do the same, instead of showing the
+;; escape codes.  A link opens with a click, or C-c RET (RET where the
+;; buffer is read-only), through `browse-url'.
+;;
+;; From a compilation and from Eshell only links are taken.  Another such
+;; sequence says which directory is current: there it would move where a
+;; task runs again, or `cd' Eshell.  A shell saying so is what it is for.
+
+(defvar compilation-filter-start)
+(defvar eshell-last-output-start)
+(defvar eshell-last-output-end)
+(defvar ansi-osc-handlers)
+(declare-function ansi-osc-apply-on-region "ansi-osc" (begin end))
+(declare-function comint-osc-process-output "comint" (_))
+
+(defconst mega-core--links-only '(("8" . ansi-osc-hyperlink-handler))
+  "The escape sequences acted on where only a link may come of one.")
+
+(defun mega-core--compilation-links ()
+  "Turn the links in what a compilation has just printed into buttons."
+  (let ((inhibit-read-only t)
+        (ansi-osc-handlers mega-core--links-only))
+    (ansi-osc-apply-on-region compilation-filter-start (point))))
+
+(defun mega-core--eshell-links ()
+  "Turn the links in what an Eshell command has just printed into buttons."
+  (let ((ansi-osc-handlers mega-core--links-only))
+    (ansi-osc-apply-on-region eshell-last-output-start eshell-last-output-end)))
+
+(defun mega-core--shell-links ()
+  "Have this shell's links turned into buttons, and its directory followed."
+  (add-hook 'comint-output-filter-functions #'comint-osc-process-output nil t))
+
+(with-eval-after-load 'compile
+  (require 'ansi-osc)
+  (add-hook 'compilation-filter-hook #'ansi-color-compilation-filter)
+  (add-hook 'compilation-filter-hook #'mega-core--compilation-links))
+
+(with-eval-after-load 'shell
+  (add-hook 'shell-mode-hook #'mega-core--shell-links))
+
+(with-eval-after-load 'esh-mode
+  (require 'ansi-osc)
+  ;; Before the control codes are seen to: those take a bell out of the
+  ;; text, and a bell is how `ls' ends a link.
+  (add-hook 'eshell-output-filter-functions #'mega-core--eshell-links -50))
+
 ;;;; General behaviour
 
 (setq use-short-answers t                  ; Emacs's own; see `mega-confirm'

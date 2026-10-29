@@ -183,7 +183,8 @@ setting at once. (Anywhere else `C-o` is Emacs's own key and opens a line.)
 text, `e` exports the hits to an editable buffer. `C-o b` switches to ripgrep, then plain grep, then back,
 and the session stays with what you chose; `(setq mega-search-backend 'rg)`
 in `local.el` makes ripgrep the one to start with. `needle -- src/*.rs`
-searches part of the project.
+searches part of the project. A space in the pattern is a space, as `\ ` is
+too; `\ --\ ` looks for ` -- ` itself.
 
 A search starts at the root of the project, every time. `C-o d` moves it to
 another directory while the prompt is open, in the project or out of it,
@@ -208,6 +209,12 @@ brackets, how each starts out:
 
 With git grep, ignored files count as untracked, so `C-o i` brings both, and
 `C-o s` leaves both out. A key the current program cannot act on says so.
+
+**Links that programs print** (`ls --hyperlink`, delta, gcc, ripgrep) are
+buttons in `M-x term`, `M-x shell`, Eshell and the buffer of a task or of
+`M-x compile`: a click opens one, or `C-c RET` (`RET` in a task's buffer).
+A `zed://` link goes to Zed, a `file://` one opens in Emacs. Most programs
+write links only to a terminal, which Eshell is not, so there they are rare.
 
 **A dev container** starts in the background: Emacs stays yours while it
 does, and the modeline says `[box: starting]` until it says `[box:NAME]`.
