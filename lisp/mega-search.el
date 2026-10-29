@@ -625,22 +625,22 @@ backslash; unless the pattern is taken literally anyway."
     (replace-regexp-in-string "[][\\^$.|?*+(){}]" "\\\\\\&" text)))
 
 (defun mega-search-word-at-point ()
-  "The word or the number the cursor is on, or nil if it is on neither.
-On, as the cursor of a terminal is on a character: right behind a word
-is not on it.  A word is what the mode takes for a name, underscores
-and all; a run of signs with no letter or digit in it is no word."
-  (let ((bounds (bounds-of-thing-at-point 'symbol)))
-    (when (and bounds (< (point) (cdr bounds)))
-      (let ((word (buffer-substring-no-properties (car bounds) (cdr bounds))))
-        (and (string-match-p "[[:alnum:]]" word)
-             word)))))
+  "The word or the number at the cursor, or nil if there is neither.
+At the cursor is on it, as the cursor of a terminal is on a character,
+or right behind its last character, where the cursor is once it has
+been typed.  A word is what the mode takes for a name, underscores and
+all; a run of signs with no letter or digit in it is no word."
+  (when-let* ((bounds (bounds-of-thing-at-point 'symbol))
+              (word (buffer-substring-no-properties (car bounds) (cdr bounds))))
+    (and (string-match-p "[[:alnum:]]" word)
+         word)))
 
 ;;;###autoload
 (defun mega-search-project (&optional initial directory)
   "Search the project as you type, starting from INITIAL.
 Called with its key, it starts from the word or the number the cursor
-is on, and from nothing if the cursor is on neither.  What it starts
-from is selected: type, and what you type takes its place.
+is on or right behind, and from nothing if there is neither.  What it
+starts from is selected: type, and what you type takes its place.
 
 It searches DIRECTORY, by default the root of the project; with a
 prefix argument, `C-u M-g a', it asks which first.  See the Commentary

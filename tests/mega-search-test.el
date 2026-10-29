@@ -903,24 +903,28 @@ And a hit in another project asks nothing about trusting it."
     (should (equal (mega-search-quote "a.b|c") "a.b|c"))))
 
 (ert-deftest mega-search-starts-from-the-word-or-number-under-the-cursor ()
-  "Asked for after use; and from nothing where the cursor is on neither."
+  "Asked for after use, twice: from the word the cursor is on, and from the
+one it is right behind, as it is once the word is typed; and from
+nothing where there is neither."
   (with-temp-buffer
     (prog-mode)
     (insert "let total_count = price * 42;  // done")
     (dolist (case '((1 . "let") (3 . "let")         ; on its first and its last letter
-                    (4 . nil)                       ; the space behind it
+                    (4 . "let")                     ; the space right behind it
                     (5 . "total_count") (10 . "total_count")
-                    (16 . nil) (17 . nil)           ; a space, the equals sign
+                    (16 . "total_count")            ; the space right behind it
+                    (17 . nil)                      ; the equals sign, behind a space
                     (25 . nil)                      ; the asterisk
                     (27 . "42") (28 . "42")
-                    (29 . nil)                      ; the semicolon behind the number
+                    (29 . "42")                     ; the semicolon right behind the number
+                    (30 . nil) (31 . nil)           ; the spaces behind the semicolon
                     (32 . nil)))                    ; a slash
       (goto-char (car case))
       (ert-info ((format "the cursor on %S, at %d" (string (char-after)) (car case)))
         (should (equal (mega-search-word-at-point) (cdr case)))))
-    ;; At the very end there is nothing under the cursor.
+    ;; At the very end the cursor is right behind the last word.
     (goto-char (point-max))
-    (should-not (mega-search-word-at-point)))
+    (should (equal (mega-search-word-at-point) "done")))
   ;; The key hands it to the prompt, as what to type to find it.
   (mega-search-test--defaults
     (mega-test-with-directory dir
@@ -940,7 +944,12 @@ And a hit in another project asks nothing about trusting it."
             (let ((inhibit-message t))
               (call-interactively #'mega-search-project)
               (should (equal (car asked) "size"))
+              ;; The dot right behind it: still the word.
               (goto-char 5)
+              (call-interactively #'mega-search-project)
+              (should (equal (car asked) "size"))
+              ;; The equals sign, behind a space: nothing.
+              (goto-char 10)
               (call-interactively #'mega-search-project)
               (should (equal (car asked) nil))
               (goto-char 12)

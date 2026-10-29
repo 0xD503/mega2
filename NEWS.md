@@ -11,6 +11,8 @@ is then tagged in git as `vX.Y.Z`.
 - In the search prompt, what you type or delete is on the screen at once,
   while the search is still at work. In a tree as large as Linux a search
   takes seconds, and `M-Backspace` left the word in sight until it was done.
+- `M-g a` starts from the word the cursor is right behind as well, as it
+  is once you have typed the word; before, only from the one it was on.
 - The tests no longer reach your desktop: a test that killed text in a
   terminal Emacs gave it to your clipboard, in place of what you had copied.
 
