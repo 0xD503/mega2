@@ -146,8 +146,6 @@ keymap in step.")
      ("TAB"       mega-snippet-next     "Go to the next place; after the last one, finish" ("<tab>"))
      ("<backtab>" mega-snippet-previous "Go back to the previous place" ("S-TAB"))
      ("C-g"       mega-snippet-finish   "Stop filling it in"))
-    ("In a prompt that starts with a word selected for you" mega-pick-selected-map mega-pick
-     ("C-g" abort-minibuffers "Leave the prompt; not just let go of the selection first"))
     ("In a prompt that searches as you type" mega-pick-typing-map mega-pick
      ("SPC" self-insert-command "A space, part of the pattern; so is \\ SPC")
      ("?"   self-insert-command "A question mark, part of the pattern"))

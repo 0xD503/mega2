@@ -117,14 +117,6 @@ Outside a prompt this does nothing."
     (overlay-put mega-pick--said 'display
                  (propertize prompt 'face 'minibuffer-prompt))))
 
-(defvar mega-pick-selected-map
-  (let ((map (make-sparse-keymap)))
-    ;; Emacs has the first C-g only take a selection away, and the second
-    ;; leave the prompt.  This selection is not of your making: C-g leaves.
-    (define-key map (kbd "C-g") #'abort-minibuffers)
-    map)
-  "Keys of a prompt whose text to start with is selected.")
-
 (defvar mega-pick-typing-map
   (let ((map (make-sparse-keymap)))
     ;; A prompt that completes takes SPC to complete a word and ? to list
@@ -135,17 +127,6 @@ Outside a prompt this does nothing."
     map)
   "Keys of every pick prompt: those that type what a query is made of.")
 
-(defun mega-pick--select-input ()
-  "Select what the prompt holds, as a selection made with the shift key is.
-What is typed takes its place, and the first key that moves the cursor
-without the shift key lets go of it."
-  (when (> (point-max) (minibuffer-prompt-end))
-    (goto-char (point-max))
-    (push-mark (minibuffer-prompt-end) t t)
-    (setq-local transient-mark-mode
-                (cons 'only (unless (eq transient-mark-mode 'lambda)
-                              transient-mark-mode)))))
-
 (defun mega-pick-read (prompt source &rest options)
   "Read a choice from the candidates SOURCE returns for the input so far.
 PROMPT is the prompt string.  SOURCE is called with the current input
@@ -155,19 +136,13 @@ OPTIONS is a plist: :category (a symbol, default `mega-pick'), :initial
 (text to start with), :history (a history variable), and :keymap (extra
 keys for the prompt, consulted before all others: before those of the
 list of choices as well, so that a prompt can give one of them a meaning
-of its own).
-
-With :selected non-nil the text to start with is selected, the way a
-word is that was picked up for you: what you type takes its place, a
-key that moves the cursor keeps it to be added to, and RET takes it as
-it is.
+of its own).  The text to start with is not selected: what is typed is
+added to it.
 
 Returns the chosen string, or the typed input if nothing matched."
   (let* ((category (or (plist-get options :category) 'mega-pick))
          (table+forget (mega-pick-table source category))
          (keymap (plist-get options :keymap))
-         (selected (and (plist-get options :selected)
-                        (plist-get options :initial)))
          (mega-pick--refresh (cdr table+forget))
          ;; Whatever the user's styles are, this category is shown unfiltered.
          (completion-category-overrides
@@ -178,9 +153,7 @@ Returns the chosen string, or the typed input if nothing matched."
         (:append
          (lambda ()
            (use-local-map (make-composed-keymap
-                           (delq nil (list keymap
-                                           (and selected mega-pick-selected-map)
-                                           mega-pick-typing-map))
+                           (delq nil (list keymap mega-pick-typing-map))
                            (current-local-map)))
            ;; The list waits a moment before it is worked out, and the
            ;; screen is drawn meanwhile: what was typed or deleted shows at
@@ -188,9 +161,7 @@ Returns the chosen string, or the typed input if nothing matched."
            ;; list skips the wait once the input is a few characters long,
            ;; which suits choices that are known; these come from a program,
            ;; and in a tree as large as Linux a search may take seconds.
-           (setq-local icomplete-max-delay-chars most-positive-fixnum)
-           (when selected
-             (mega-pick--select-input))))
+           (setq-local icomplete-max-delay-chars most-positive-fixnum)))
       (completing-read prompt (car table+forget) nil nil
                        (plist-get options :initial)
                        (plist-get options :history)))))

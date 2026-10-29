@@ -639,8 +639,8 @@ all; a run of signs with no letter or digit in it is no word."
 (defun mega-search-project (&optional initial directory)
   "Search the project as you type, starting from INITIAL.
 Called with its key, it starts from the word or the number the cursor
-is on or right behind, and from nothing if there is neither.  What it
-starts from is selected: type, and what you type takes its place.
+is on or right behind, and from nothing if there is neither.  What you
+type is added to what it starts from.
 
 It searches DIRECTORY, by default the root of the project; with a
 prefix argument, `C-u M-g a', it asks which first.  See the Commentary
@@ -674,7 +674,6 @@ moves the search to another directory while it is open."
                        #'mega-search-run
                        :category 'mega-search
                        :initial initial
-                       :selected t
                        :history 'mega-search-history
                        :keymap mega-search-map)
                     ;; However the prompt was left: by a choice, which is

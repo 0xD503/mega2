@@ -64,9 +64,9 @@ minibuffer list on: the keys are simply waiting in the input queue."
                                  '("apple" "banana" "mango")))))))
     (unless (equal choice "banana")
       (mega-terminal-probe--problem "the prompt returned %S, not the entry" choice)))
-  ;; A prompt that starts with a word picked up for you has it selected:
-  ;; typing replaces it, moving the cursor keeps it, RET takes it, and one
-  ;; C-g leaves, where Emacs would have the first only drop the selection.
+  ;; A prompt that starts with a word picked up for you: what is typed is
+  ;; added to it (asked for after use; it was selected, and replaced), RET
+  ;; takes the entry it leads to, and one C-g leaves.
   (let ((fruit (lambda (keys)
                  (mega-terminal-probe--typing keys
                    (mega-pick-read
@@ -74,19 +74,20 @@ minibuffer list on: the keys are simply waiting in the input queue."
                     (lambda (input)
                       (seq-filter (lambda (fruit) (string-search input fruit))
                                   '("apple" "banana" "mango")))
-                    :initial "an" :selected t)))))
+                    :initial "an")))))
     (dolist (case '(("RET" . "banana")
-                    ("pp RET" . "apple")
-                    ("C-e g RET" . "mango")
+                    ("g RET" . "mango")
+                    ;; Replaced, pp would have found the apple.
+                    ("pp RET" . "anpp")
                     ("C-n RET" . "mango")))
       (let ((choice (funcall fruit (car case))))
         (unless (equal choice (cdr case))
-          (mega-terminal-probe--problem "with its text selected, %s took %S and not %S"
+          (mega-terminal-probe--problem "starting from a word, %s took %S and not %S"
                                         (car case) choice (cdr case)))))
     (unless (eq 'left (condition-case nil
                           (funcall fruit "C-g RET")
                         (quit 'left)))
-      (mega-terminal-probe--problem "one C-g did not leave a prompt whose text was selected")))
+      (mega-terminal-probe--problem "one C-g did not leave a prompt that started from a word")))
   ;; Fuzzy matching in an ordinary prompt.
   (let ((choice (mega-terminal-probe--typing "srcmn RET"
                   (completing-read "File: " '("README.md" "src/lib.rs" "src/main.rs")))))
@@ -180,18 +181,22 @@ minibuffer list on: the keys are simply waiting in the input queue."
                 (mega-terminal-probe--problem
                  "after C-o d the search prompt said %S" (car said)))
               (kill-buffer)
-              ;; Asked for first, and then a search as any other.
-              (setq unread-command-events
-                    (append (listify-key-sequence (kbd "C-a C-k"))
-                            (string-to-list other)
-                            (listify-key-sequence (kbd "M-j needle RET"))))
-              (let ((current-prefix-arg '(4)))
-                (call-interactively #'mega-search-project))
-              (setq unread-command-events nil)
-              (unless (equal buffer-file-name (expand-file-name "there.txt" other))
-                (mega-terminal-probe--problem
-                 "C-u M-g a searched %S" (or buffer-file-name (buffer-name))))
-              (kill-buffer))
+              ;; Asked for first, and then a search as any other.  From a
+              ;; buffer with no word at the cursor: the key starts from such a
+              ;; word, and what is typed is added to it.
+              (with-temp-buffer
+                (setq default-directory project)
+                (setq unread-command-events
+                      (append (listify-key-sequence (kbd "C-a C-k"))
+                              (string-to-list other)
+                              (listify-key-sequence (kbd "M-j needle RET"))))
+                (let ((current-prefix-arg '(4)))
+                  (call-interactively #'mega-search-project))
+                (setq unread-command-events nil)
+                (unless (equal buffer-file-name (expand-file-name "there.txt" other))
+                  (mega-terminal-probe--problem
+                   "C-u M-g a searched %S" (or buffer-file-name (buffer-name))))
+                (kill-buffer)))
           (error (mega-terminal-probe--problem "searching another directory failed: %S"
                                                err)))
       (setq unread-command-events nil)

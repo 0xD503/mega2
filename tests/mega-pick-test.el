@@ -180,10 +180,9 @@ are characters of it, not completion of a word and a list of choices."
                    (apply #'mega-pick-read "Say: " #'ignore options)))))
     (should (equal (funcall typed "f o o SPC b a r ? \\ SPC x RET")
                    "foo bar?\\ x"))
-    ;; Over a selected start, as `M-g a' offers the word at point, a space
-    ;; takes its place like any other character.
-    (should (equal (funcall typed "SPC a RET" :initial "word" :selected t)
-                   " a"))))
+    ;; After a start, as `M-g a' offers the word at point: added to it.
+    (should (equal (funcall typed "SPC a RET" :initial "word")
+                   "word a"))))
 
 (ert-deftest mega-pick-tab-completes-nothing-and-signals-nothing ()
   "The style's try function keeps to what Emacs expects of one: nil, t,

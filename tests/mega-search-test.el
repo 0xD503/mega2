@@ -934,8 +934,9 @@ nothing where there is neither."
         (cl-letf (((symbol-function 'mega-pick-read)
                    (lambda (_prompt _source &rest options)
                      (push (plist-get options :initial) asked)
-                     ;; Selected, so that typing something else replaces it.
-                     (should (plist-get options :selected))
+                     ;; Not selected: asked for after use, as typing has
+                     ;; to add to it and not replace it.
+                     (should-not (plist-get options :selected))
                      "")))
           (with-temp-buffer
             (setq default-directory dir)
