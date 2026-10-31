@@ -416,6 +416,24 @@ from 8 up, and not at all below: a terminal of two keeps its own."
         (should (eq (and (memq 'hints switched) t)
                     (featurep 'tty-child-frames)))))))
 
+(ert-deftest mega-ui-the-wheel-scrolls-in-an-emacs-without-x ()
+  ;; Emacs loads mwheel, what binds the wheel, by itself only where it was
+  ;; built for X; without it each notch was "<wheel-up> is undefined".
+  ;; Flymake loads it too, and these tests load Flymake: so another Emacs,
+  ;; with MEGA and nothing else.
+  (mega-test-with-directory dir
+    (let ((report (expand-file-name "report" dir)))
+      (call-process (expand-file-name invocation-name invocation-directory)
+                    nil nil nil "-Q" "--batch"
+                    "-l" (expand-file-name "early-init.el" mega-test-config-dir)
+                    "-l" (expand-file-name "init.el" mega-test-config-dir)
+                    "--eval"
+                    (format "(progn (fset 'xterm-mouse-mode #'ignore) (fset 'tty-tip-mode #'ignore) (let ((mega-mouse t)) (mega-ui-mouse)) (with-temp-file %S (prin1 (mapcar (lambda (event) (lookup-key global-map (vector event))) '(wheel-up wheel-down wheel-left wheel-right)) (current-buffer))))"
+                            report))
+      (should (equal (with-temp-buffer (insert-file-contents report)
+                                       (read (current-buffer)))
+                     (make-list 4 'mwheel-scroll))))))
+
 (ert-deftest mega-ui-the-wheel-scrolls-evenly ()
   (should-not mouse-wheel-progressive-speed)
   (should (equal (car mouse-wheel-scroll-amount) 3)))

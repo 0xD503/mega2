@@ -8,6 +8,9 @@ is then tagged in git as `vX.Y.Z`.
 
 ## Not yet released
 
+- The mouse wheel scrolls the text, three lines a notch, in an Emacs built
+  without X (`emacs-nox`). Before, a notch said "<wheel-up> is undefined"
+  until something such as a language server had loaded the wheel's keys.
 - In the search prompt, what you type or delete is on the screen at once,
   while the search is still at work. In a tree as large as Linux a search
   takes seconds, and `M-Backspace` left the word in sight until it was done.

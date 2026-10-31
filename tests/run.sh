@@ -23,8 +23,9 @@
 #             terminal's grid really holds: that the cursor is on the
 #             character Emacs put it on, after every awkward sequence in
 #             mega-screen-lines.txt, that no character of them is left
-#             out, and that the lines on screen are the lines of the
-#             buffer.  The tmux is one of its own; yours is not touched.
+#             out, that the lines on screen are the lines of the buffer,
+#             and that the wheel scrolls them.  The tmux is one of its
+#             own; yours is not touched.
 #
 #   container start a real container with podman and use it: run, build and
 #             debug in it.  Needs MEGA_REAL_IMAGE; makes one container, with
@@ -733,6 +734,19 @@ grid_wait() {
     return 1
 }
 
+# The same, for the text $1 on the top row only.
+grid_top() {
+    grid_tries=0
+    while [ "$grid_tries" -lt "$2" ]; do
+        case $(grid capture-pane -p -t grid 2>/dev/null | sed -n 1p) in
+            *"$1"*) return 0 ;;
+        esac
+        grid_tries=$((grid_tries + 1))
+        sleep 0.1
+    done
+    return 1
+}
+
 terminal_grid() {
     if ! command -v tmux >/dev/null 2>&1; then
         skip "terminal  what a terminal's grid really holds (tmux is not installed)"
@@ -854,6 +868,44 @@ ${line%%:*}: the cursor is on '${at#* }'"
             bad "terminal  on the grid of $version: a file is not numbered, ruled and unwrapped"
             printf '%s\n' "$rows" | cut -c1-200 | detail ;;
     esac
+
+    # Six: the wheel scrolls, three lines a notch.  What is typed here is
+    # what a terminal sends for a notch down, or up, over the text.  In an
+    # Emacs built without X nothing bound the wheel, and each notch was
+    # "<wheel-up> is undefined".
+    rows_file="$SANDBOX/grid/rows.txt"
+    i=1
+    while [ "$i" -le 100 ]; do printf 'row %d\n' "$i"; i=$((i + 1)); done > "$rows_file"
+    if ! grid_start "$rows_file" 12 '(setq mega-trust-ask-on-open nil mega-blame nil)' ||
+        ! grid_wait 'rows.txt' 150; then
+        bad "terminal  on the grid of $version: Emacs did not come up on a file"
+        grid kill-server 2>/dev/null
+        return
+    fi
+    # The mouse is switched on once Emacs is up, and tmux knows when it is.
+    tries=0
+    while [ "$tries" -lt 50 ] &&
+        [ "$(grid display-message -p -t grid '#{mouse_any_flag}')" != 1 ]; do
+        tries=$((tries + 1))
+        sleep 0.1
+    done
+    down=$(printf '\033[<65;10;5M')
+    up=$(printf '\033[<64;10;5M')
+    grid send-keys -t grid -l "$down"
+    grid send-keys -t grid -l "$down"
+    wheeled=no
+    if grid_top 'row 7 ' 30; then
+        grid send-keys -t grid -l "$up"
+        grid_top 'row 4 ' 30 && wheeled=yes
+    fi
+    grid capture-pane -p -t grid > "$SANDBOX/grid/wheel.txt"
+    grid kill-server 2>/dev/null
+    if [ "$wheeled" = yes ]; then
+        ok "terminal  on the grid of $version: the wheel scrolls the text, three lines a notch"
+    else
+        bad "terminal  on the grid of $version: the wheel does not scroll the text"
+        cut -c1-200 < "$SANDBOX/grid/wheel.txt" | detail
+    fi
 
     # Two: a line with such a sequence in it, and a note that comes to the
     # end of a line and goes again.  Afterwards every line on the screen is

@@ -322,7 +322,7 @@ where both are in use."
 (defcustom mega-mouse t
   "Non-nil to use the mouse in a terminal.
 With it on, the terminal's own text selection needs Shift held down.
-Under tmux the mouse reaches Emacs only if tmux has `mouse on'."
+Under tmux the mouse reaches Emacs whether tmux has `mouse' on or off."
   :type 'boolean
   :group 'mega)
 
@@ -339,6 +339,11 @@ Under tmux the mouse reaches Emacs only if tmux has `mouse on'."
   "Switch the mouse on in a terminal, if `mega-mouse' says so."
   (when (and mega-mouse (not (display-graphic-p)))
     (xterm-mouse-mode 1)
+    ;; What binds the wheel, mwheel, is loaded with Emacs only where Emacs
+    ;; was built for X.  In an Emacs for terminals alone each notch was
+    ;; "<wheel-up> is undefined".  Loading it binds the wheel unless
+    ;; `mouse-wheel-mode' was switched off.
+    (require 'mwheel)
     ;; Hints in a popup need the same terminal support MEGA's own popups do.
     (when (and (featurep 'tty-child-frames) (fboundp 'tty-tip-mode))
       (tty-tip-mode 1))))
