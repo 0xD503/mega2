@@ -9,9 +9,10 @@
 ;;        └──o──o
 ;;
 ;; Each `o' is a state; `@' is the one on screen, and `s' the one that is
-;; in the file, as last saved or opened.  A line to the right is a change; a
-;; fork is where you undid something and then typed something else.  Moving
-;; around the picture changes the text as you go:
+;; in the file, as last saved or opened.  When the two are one, it stays an
+;; `s', highlighted as `@' is.  A line to the right is a change; a fork is
+;; where you undid something and then typed something else.  Moving around
+;; the picture changes the text as you go:
 ;;
 ;;   b / f   back to the older state / forward to the newer one
 ;;   p / n   the other branches of the same fork
@@ -215,9 +216,10 @@ Box-drawing characters where the terminal has them, ASCII otherwise."
   "The picture of TREE as a list of strings, one per row.
 PLACES is its `mega-undo-tree-layout', CURRENT the node to mark, GLYPHS
 what `mega-undo-tree-glyphs' returns, and SAVED the nodes that are the
-text of the file, `mega-undo-tree-in-file'; CURRENT is drawn as itself
-even if it is one of them.  A node is drawn in the row of its place, at
-three times the column of its place."
+text of the file, `mega-undo-tree-in-file'.  CURRENT is drawn as one of
+those if it is one: that it is the file's text is what you would not
+see otherwise, and where it is the caller shows with a face.  A node is
+drawn in the row of its place, at three times the column of its place."
   (let* ((count (plist-get tree :count))
          (children (plist-get tree :children))
          (across (plist-get glyphs :across))
@@ -232,8 +234,8 @@ three times the column of its place."
                (others (cdr kids))
                (from (1+ row)))
           (mega-undo-tree--put cells row column
-                               (plist-get glyphs (cond ((= node current) :current)
-                                                       ((memq node saved) :saved)
+                               (plist-get glyphs (cond ((memq node saved) :saved)
+                                                       ((= node current) :current)
                                                        (t :node))))
           (when kids
             (mega-undo-tree--put cells row (+ column 1) across)

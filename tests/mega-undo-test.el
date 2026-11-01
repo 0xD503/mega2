@@ -439,8 +439,9 @@ way out would be one more change than they wrote down."
       (should (equal (buffer-string) "a"))
       (should-not (buffer-modified-p))
       (should (equal (mega-undo-test--in-file) '(1)))
-      ;; There it is drawn as the state on screen.
-      (should (equal (car (mega-undo-test--saved-picture)) "o--@--o--o"))
+      ;; There it stays an `s' (asked for after use: as an `@' it did not
+      ;; say that the text on screen was the file's).
+      (should (equal (car (mega-undo-test--saved-picture)) "o--s--o--o"))
       ;; Saved in another state, the mark goes with it: the file has
       ;; another text now.
       (mega-undo-test--go 3)
@@ -481,7 +482,15 @@ way out would be one more change than they wrote down."
               (goto-char (point-min))
               (search-forward "s")
               (should (eq (get-text-property (1- (point)) 'face)
-                          'mega-undo-tree-saved)))
+                          'mega-undo-tree-saved))
+              ;; On it, it is still an `s', and the one highlighted as the
+              ;; state on screen, with the point on it.
+              (mega-undo-tree-backward)
+              (should-not (buffer-modified-p buffer))
+              (should (string-match-p "\\`o..s..o\n\\'" (buffer-string)))
+              (should (eq (char-after) ?s))
+              (should (eq (get-text-property (point) 'face)
+                          'mega-undo-tree-current)))
           (dolist (each (buffer-list))
             (when (string-prefix-p "*undo: " (buffer-name each))
               (kill-buffer each))))))))

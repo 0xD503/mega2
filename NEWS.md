@@ -9,9 +9,9 @@ is then tagged in git as `vX.Y.Z`.
 ## Not yet released
 
 - In the undo tree (`C-x u`) the state that is in the file is marked `s`.
-  Moving about the tree no longer loses which state that is: once it was
-  lost, getting back to the saved text, by the tree or by `C-/`, left the
-  buffer marked as changed.
+  On it, it stays an `s`, highlighted as `@` is. Moving about the tree no
+  longer loses which state that is: once it was lost, getting back to the
+  saved text, by the tree or by `C-/`, left the buffer marked as changed.
 - In a prompt for a file, Backspace deletes one character, as anywhere
   else; after a `/` it deleted the whole directory name before it, and on
   `~/` it spelled out your home directory and deleted its last part.
