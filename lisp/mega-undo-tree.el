@@ -5,12 +5,13 @@
 ;; `C-x u' opens a small window under the text showing every state the
 ;; buffer has been in:
 ;;
-;;     o──o──o──o──@
+;;     o──o──s──o──@
 ;;        └──o──o
 ;;
-;; Each `o' is a state; `@' is the one on screen.  A line to the right is a
-;; change; a fork is where you undid something and then typed something
-;; else.  Moving around the picture changes the text as you go:
+;; Each `o' is a state; `@' is the one on screen, and `s' the one that is
+;; in the file, as last saved or opened.  A line to the right is a change; a
+;; fork is where you undid something and then typed something else.  Moving
+;; around the picture changes the text as you go:
 ;;
 ;;   b / f   back to the older state / forward to the newer one
 ;;   p / n   the other branches of the same fork
@@ -34,7 +35,9 @@
 ;; where the move only led back to where the list once ended.  That throws
 ;; records away, so it does not rest on any claim that two states are equal:
 ;; it is done only back to a state in which the text was actually seen, and
-;; found, by hash, to be the text there is now.
+;; found, by hash, to be the text there is now.  Nor is it done past the
+;; note of the last save, which is how the tree, and `undo' too, know which
+;; state is the file's text.
 ;;
 ;; Model and display are separate.  `mega-undo-tree-build', `-route',
 ;; `-layout' and `-lines' are plain functions of data and are what the tests
@@ -52,6 +55,10 @@
 
 (defface mega-undo-tree-current '((t :inherit (bold warning)))
   "The state of the text that is on screen."
+  :group 'mega)
+
+(defface mega-undo-tree-saved '((t :inherit (bold success)))
+  "The state of the text that is in the file."
   :group 'mega)
 
 (defface mega-undo-tree-line '((t :inherit shadow))
@@ -116,6 +123,37 @@ if FROM and TO are the same node."
             (setq best (cons source dest)))))
       best)))
 
+(defun mega-undo-tree-in-file (tree states modtime unmodified)
+  "The nodes of TREE whose text is the text of the file, oldest first.
+STATES is what TREE was built from, the `mega-undo-states' of the undo
+list.  MODTIME is the buffer's `visited-file-modtime', and UNMODIFIED
+non-nil if the buffer is unmodified.
+
+The first change made to an unmodified buffer begins with a record (t
+. TIME): TIME is when the file was last written, the file the text then
+agreed with.  So the state before such a group is the file's text if
+TIME is still the file's, which is when undoing back to that state
+leaves the buffer unmodified.  So is the current state, when the buffer
+is unmodified.  A file that has never been written has no such time,
+nor a state that is its text."
+  (when (consp modtime)
+    (let ((node (plist-get tree :node))
+          (found (and unmodified (list (mega-undo-tree-current tree)))))
+      (dotimes (index (length states))
+        (when (> index 0)
+          ;; The record a group begins with is the last before its end.
+          (let ((tail (aref states index)) (first nil))
+            (while (and (consp tail) (car tail))
+              (setq first (car tail)
+                    tail (cdr tail)))
+            (when (and (eq (car-safe first) t)
+                       (consp (cdr first))
+                       (time-equal-p (cdr first) modtime))
+              (let ((saved (aref node (1- index))))
+                (unless (memq saved found)
+                  (push saved found)))))))
+      (sort found #'<))))
+
 (defun mega-undo-tree-trim-points (tree)
   "The states TREE's undo list could be cut back to without losing a node.
 Moving about adds groups to the list that lead only to states it already
@@ -166,18 +204,20 @@ row below everything drawn so far.  Columns count nodes, not characters."
   "The characters the tree is drawn with: a plist.
 Box-drawing characters where the terminal has them, ASCII otherwise."
   (if (and (char-displayable-p ?─) (char-displayable-p ?└))
-      '(:node ?o :current ?@ :across ?─ :down ?│ :fork ?├ :last ?└)
-    '(:node ?o :current ?@ :across ?- :down ?| :fork ?+ :last ?`)))
+      '(:node ?o :current ?@ :saved ?s :across ?─ :down ?│ :fork ?├ :last ?└)
+    '(:node ?o :current ?@ :saved ?s :across ?- :down ?| :fork ?+ :last ?`)))
 
 (defun mega-undo-tree--put (cells row column character)
   "Note in CELLS that CHARACTER is drawn at COLUMN of ROW."
   (aset cells row (cons (cons column character) (aref cells row))))
 
-(defun mega-undo-tree-lines (tree places current glyphs)
+(defun mega-undo-tree-lines (tree places current glyphs &optional saved)
   "The picture of TREE as a list of strings, one per row.
 PLACES is its `mega-undo-tree-layout', CURRENT the node to mark, GLYPHS
-what `mega-undo-tree-glyphs' returns.  A node is drawn in the row of its
-place, at three times the column of its place."
+what `mega-undo-tree-glyphs' returns, and SAVED the nodes that are the
+text of the file, `mega-undo-tree-in-file'; CURRENT is drawn as itself
+even if it is one of them.  A node is drawn in the row of its place, at
+three times the column of its place."
   (let* ((count (plist-get tree :count))
          (children (plist-get tree :children))
          (across (plist-get glyphs :across))
@@ -192,7 +232,9 @@ place, at three times the column of its place."
                (others (cdr kids))
                (from (1+ row)))
           (mega-undo-tree--put cells row column
-                               (plist-get glyphs (if (= node current) :current :node)))
+                               (plist-get glyphs (cond ((= node current) :current)
+                                                       ((memq node saved) :saved)
+                                                       (t :node))))
           (when kids
             (mega-undo-tree--put cells row (+ column 1) across)
             (mega-undo-tree--put cells row (+ column 2) across))
@@ -292,7 +334,8 @@ state the list already ended in once, the list is cut back to there, so
 that wandering about does not push your oldest history out.  Cutting
 discards records, and is the one thing here that could not be undone, so
 it is done on evidence and not on the list's word: only back to a state
-in which this very text was seen, compared by hash."
+in which this very text was seen, compared by hash.  Nor past the note
+of the file's last save; see `mega-undo-tree--notes-a-save-p'."
   (with-current-buffer buffer
     (barf-if-buffer-read-only)
     (when (buffer-narrowed-p)
@@ -316,10 +359,29 @@ in which this very text was seen, compared by hash."
                                                        mega-undo-tree--seen)
                                               hash))
                                      (mega-undo-tree-trim-points (plist-get read :tree))))))
-          (when state
+          (when (and state
+                     (not (mega-undo-tree--notes-a-save-p buffer-undo-list
+                                                          (aref states state))))
             (setq buffer-undo-list (aref states state))
             (undo-boundary)))
         t))))
+
+(defun mega-undo-tree--notes-a-save-p (list end)
+  "Non-nil if LIST, before its tail END, notes the file's last save.
+That is a record (t . TIME) with TIME the time of the file now: it is
+what tells which state is the file's text, to the tree and to `undo'
+alike, which leaves the buffer unmodified there.  Cutting LIST back to
+END would lose it."
+  (let ((modtime (visited-file-modtime))
+        (found nil))
+    (when (consp modtime)
+      (while (and (consp list) (not (eq list end)) (not found))
+        (let ((record (car list)))
+          (setq found (and (eq (car-safe record) t)
+                           (consp (cdr record))
+                           (time-equal-p (cdr record) modtime))
+                list (cdr list)))))
+    found))
 
 ;;;; Choosing where to go
 
@@ -375,14 +437,26 @@ that node, or `origin'; LAST-CONS is the last cons the list had.")
 
 (defun mega-undo-tree--draw ()
   "Draw the tree of the buffer this tree buffer belongs to."
-  (let* ((tree (plist-get (mega-undo-tree--read mega-undo-tree--buffer) :tree))
+  (let* ((read (mega-undo-tree--read mega-undo-tree--buffer))
+         (tree (plist-get read :tree))
          (places (mega-undo-tree-layout tree))
          (current (mega-undo-tree-current tree))
+         (saved (with-current-buffer mega-undo-tree--buffer
+                  (and buffer-file-name
+                       (mega-undo-tree-in-file tree (plist-get read :states)
+                                               (visited-file-modtime)
+                                               (not (buffer-modified-p))))))
          (glyphs (mega-undo-tree-glyphs))
          (inhibit-read-only t))
     (erase-buffer)
-    (dolist (line (mega-undo-tree-lines tree places current glyphs))
+    (dolist (line (mega-undo-tree-lines tree places current glyphs saved))
       (insert (propertize line 'face 'mega-undo-tree-line) "\n"))
+    (dolist (node saved)
+      (unless (= node current)
+        (goto-char (point-min))
+        (forward-line (car (aref places node)))
+        (forward-char (* 3 (cdr (aref places node))))
+        (put-text-property (point) (1+ (point)) 'face 'mega-undo-tree-saved)))
     (goto-char (point-min))
     (forward-line (car (aref places current)))
     (forward-char (* 3 (cdr (aref places current))))

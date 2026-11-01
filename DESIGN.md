@@ -679,8 +679,9 @@ running Emacs did.
   once trusted is trusted. Storing an identity beside the path was
   considered in review and left out: there is none that a hostile checkout
   could not copy.
-- **Undo tree extras** left out: a diff between two states, and marking the
-  state that is saved on disk.
+- **Undo tree extras** left out: a diff between two states. The state that
+  is saved in the file is marked, `s`, for this session's saves: a stored
+  history keeps no record of when the file was written.
 - **One ruler.** Emacs draws a single ruler; several at once would be new code.
 - **Breakpoints with GUD** still need a running debugger: only the adapter
   path keeps them between sessions.

@@ -8,6 +8,10 @@ is then tagged in git as `vX.Y.Z`.
 
 ## Not yet released
 
+- In the undo tree (`C-x u`) the state that is in the file is marked `s`.
+  Moving about the tree no longer loses which state that is: once it was
+  lost, getting back to the saved text, by the tree or by `C-/`, left the
+  buffer marked as changed.
 - The mouse wheel scrolls the text, three lines a notch, in an Emacs built
   without X (`emacs-nox`). Before, a notch said "<wheel-up> is undefined"
   until something such as a language server had loaded the wheel's keys.

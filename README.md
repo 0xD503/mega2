@@ -116,7 +116,7 @@ lists what can follow.
 | `C-c g g` | Start the debugger (`C-c g b` breakpoint, `r` run, `n` step, `c` continue) |
 | `C-c k u` | Start or join the project's dev container (`C-c k d` leaves it) |
 | `C-c l c` | Claude session for the project (`C-c l a` ask, `r` rewrite, `e` explain) |
-| `C-x u` | The undo history as a tree |
+| `C-x u` | The undo history as a tree: `@` is where the text is, `s` what is saved |
 | `C-c w s` | Save the open files and the window layout (`C-c w r` brings them back) |
 | `C-c s` | Insert a snippet |
 | `C-/` | Undo (`C-M-_` redoes) |

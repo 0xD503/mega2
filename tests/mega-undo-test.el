@@ -122,7 +122,7 @@ in a row; a function is called."
 ;;;; The picture
 
 (defconst mega-undo-test--ascii
-  '(:node ?o :current ?@ :across ?- :down ?| :fork ?+ :last ?`))
+  '(:node ?o :current ?@ :saved ?s :across ?- :down ?| :fork ?+ :last ?`))
 
 (defun mega-undo-test--picture ()
   "The current buffer's undo tree, drawn in ASCII."
@@ -409,6 +409,82 @@ The texts these tests compare end without a newline; adding one on the
 way out would be one more change than they wrote down."
   (let ((inhibit-message t) (require-final-newline nil))
     (save-buffer)))
+
+(defun mega-undo-test--in-file ()
+  "The nodes of the current buffer's undo tree that are its file's text."
+  (let ((read (mega-undo-tree--read (current-buffer))))
+    (mega-undo-tree-in-file (plist-get read :tree) (plist-get read :states)
+                            (visited-file-modtime) (not (buffer-modified-p)))))
+
+(defun mega-undo-test--saved-picture ()
+  "The current buffer's undo tree, drawn in ASCII with the file's state."
+  (let ((tree (mega-undo-test--tree)))
+    (mega-undo-tree-lines tree (mega-undo-tree-layout tree)
+                          (mega-undo-tree-current tree) mega-undo-test--ascii
+                          (mega-undo-test--in-file))))
+
+(ert-deftest mega-undo-tree-marks-the-state-that-is-in-the-file ()
+  "Asked for after use: the tree did not show which state was saved."
+  (mega-undo-test--with-file file
+    (mega-test-visiting buffer file
+      ;; A file not yet written has no state that is its text.
+      (mega-undo-test--do "a")
+      (should-not (mega-undo-test--in-file))
+      (mega-undo-test--do #'mega-undo-test--save "b" "c" '(undo 1) "x")
+      (should (equal (mega-undo-test--saved-picture)
+                     '("o--s--o--o"
+                       "      `--@")))
+      ;; It is the state in which Emacs, too, takes the text for the file's.
+      (mega-undo-test--go 1)
+      (should (equal (buffer-string) "a"))
+      (should-not (buffer-modified-p))
+      (should (equal (mega-undo-test--in-file) '(1)))
+      ;; There it is drawn as the state on screen.
+      (should (equal (car (mega-undo-test--saved-picture)) "o--@--o--o"))
+      ;; Saved in another state, the mark goes with it: the file has
+      ;; another text now.
+      (mega-undo-test--go 3)
+      (mega-undo-test--save)
+      (mega-undo-test--go 4)
+      (should (equal (buffer-string) "abx"))
+      (should (equal (mega-undo-test--saved-picture)
+                     '("o--o--o--s"
+                       "      `--@")))
+      ;; Moving about cuts the list back, but never past that save: then
+      ;; neither the tree nor Emacs would know the file's text again.
+      (dotimes (_ 3)
+        (mega-undo-test--go 1)
+        (mega-undo-test--go 4))
+      (should (equal (mega-undo-test--in-file) '(3)))
+      (mega-undo-test--go 3)
+      (should (equal (buffer-string) "abc"))
+      (should-not (buffer-modified-p)))))
+
+(ert-deftest mega-undo-tree-marks-no-state-of-a-buffer-without-a-file ()
+  (mega-undo-test--with-history '("a" "b")
+    (let ((read (mega-undo-tree--read (current-buffer))))
+      (set-buffer-modified-p nil)
+      (should-not (mega-undo-tree-in-file (plist-get read :tree)
+                                          (plist-get read :states)
+                                          (visited-file-modtime) t)))))
+
+(ert-deftest mega-undo-tree-window-shows-the-saved-state ()
+  (mega-undo-test--with-file file
+    (mega-test-visiting buffer file
+      (save-window-excursion
+        (unwind-protect
+            (progn
+              (switch-to-buffer buffer)
+              (mega-undo-test--do "a" #'mega-undo-test--save "b")
+              (mega-undo-tree)
+              (should (string-match-p "\\`o..s..@\n\\'" (buffer-string)))
+              (goto-char (point-min))
+              (search-forward "s")
+              (should (eq (get-text-property (1- (point)) 'face)
+                          'mega-undo-tree-saved)))
+          (dolist (each (buffer-list))
+            (when (string-prefix-p "*undo: " (buffer-name each))
+              (kill-buffer each))))))))
 
 (ert-deftest mega-undo-history-comes-back-with-the-file ()
   (mega-undo-test--with-file file
