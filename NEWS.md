@@ -12,6 +12,10 @@ is then tagged in git as `vX.Y.Z`.
   Moving about the tree no longer loses which state that is: once it was
   lost, getting back to the saved text, by the tree or by `C-/`, left the
   buffer marked as changed.
+- In a prompt for a file, Backspace deletes one character, as anywhere
+  else; after a `/` it deleted the whole directory name before it, and on
+  `~/` it spelled out your home directory and deleted its last part.
+  `M-Backspace` deletes a word, as before.
 - The mouse wheel scrolls the text, three lines a notch, in an Emacs built
   without X (`emacs-nox`). Before, a notch said "<wheel-up> is undefined"
   until something such as a language server had loaded the wheel's keys.

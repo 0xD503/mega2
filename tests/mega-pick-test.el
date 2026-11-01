@@ -211,6 +211,19 @@ or (STRING . POINT); a bare string broke every key that completes."
     (should (equal (nreverse seen)
                    '(self-insert-command self-insert-command "ab")))))
 
+;;;; Deleting in a file name
+
+(ert-deftest mega-minibuffer-backspace-deletes-a-character-of-a-file-name ()
+  "Asked for after use: after a `/' it deleted the whole directory name.
+The keys themselves are pressed on a real terminal, in
+mega-terminal-probe.el: Emacs leaves the list's keys out of a prompt
+whose keys are simulated."
+  (require 'icomplete)
+  (should (eq (lookup-key icomplete-fido-mode-map (kbd "DEL"))
+              'delete-backward-char))
+  ;; M-Backspace is left to Emacs, which deletes a word.
+  (should-not (lookup-key icomplete-fido-mode-map (kbd "M-DEL"))))
+
 ;;;; A page at a time
 
 (ert-deftest mega-minibuffer-a-page-is-what-the-prompt-shows-less-one ()

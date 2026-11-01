@@ -14,6 +14,8 @@
 ;;
 ;; The keys for a page are MEGA's: Emacs's list has none, and in a prompt
 ;; that lists the hits of a search there are more than a screen of them.
+;; Backspace is Emacs's usual one, a character at a time, also in a file
+;; name; the list's own went up a directory.
 
 ;;; Code:
 
@@ -23,6 +25,7 @@
 (defvar icomplete-prospects-height)
 (defvar icomplete-scroll)
 (defvar icomplete-show-matches-on-no-input)
+(defvar icomplete-fido-mode-map)
 (defvar icomplete-vertical-mode-minibuffer-map)
 
 (declare-function icomplete-forward-completions "icomplete")
@@ -78,6 +81,10 @@ own there."
       (setq left (1- left)))))
 
 (with-eval-after-load 'icomplete
+  ;; Backspace deletes one character, as everywhere else.  Fido's own, after
+  ;; a `/' in a file name, deleted the whole directory name before it, the
+  ;; way ido does.  M-Backspace deletes a word, as ever.
+  (define-key icomplete-fido-mode-map (kbd "DEL") #'delete-backward-char)
   (dolist (key '("C-v" "<next>"))
     (define-key icomplete-vertical-mode-minibuffer-map (kbd key)
                 #'mega-minibuffer-page-down))

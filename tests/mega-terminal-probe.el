@@ -93,6 +93,21 @@ minibuffer list on: the keys are simply waiting in the input queue."
                   (completing-read "File: " '("README.md" "src/lib.rs" "src/main.rs")))))
     (unless (equal choice "src/main.rs")
       (mega-terminal-probe--problem "fuzzy matching chose %S" choice)))
+  ;; In a file name Backspace deletes a character, M-Backspace a word.
+  ;; Asked for after use: after a `/' Backspace deleted the directory name.
+  (let* ((top (file-name-as-directory
+               (make-temp-file (expand-file-name "probe-" (getenv "MEGA_TEST_SANDBOX"))
+                               t)))
+         (sub (file-name-as-directory (expand-file-name "sub" top))))
+    (make-directory sub)
+    (dolist (case `(("DEL M-j" . ,(directory-file-name sub))
+                    ("DEL DEL M-j" . ,(substring sub 0 -2))
+                    ("M-DEL M-j" . ,top)))
+      (let ((got (mega-terminal-probe--typing (car case)
+                   (read-file-name "Find file: " sub))))
+        (unless (equal (expand-file-name got) (cdr case))
+          (mega-terminal-probe--problem "in a file name, %s left %S and not %S"
+                                        (car case) got (cdr case))))))
   ;; A page at a time, in a list longer than the prompt shows.  The keys
   ;; are waiting before the list is drawn, which is the hard case; and the
   ;; prompt keeps no history, which would put what was chosen first.
