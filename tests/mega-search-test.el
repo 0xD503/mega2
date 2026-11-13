@@ -815,6 +815,73 @@ They are in the prompt now, for as long as it is open."
             (should (string-match-p "2 hits" (buffer-string))))
           (kill-buffer "*mega-search*"))))))
 
+(ert-deftest mega-search-replaces-in-every-hit-and-only-where-it-is-safe ()
+  "Asked for after use: replacing in the whole project.  An edited hit is
+written over its line in the file, so only a hit that is that line can be."
+  (skip-unless (executable-find "git"))
+  (mega-search-test--defaults
+    (mega-test-with-directory dir
+      (mega-test-write (expand-file-name "a.txt" dir) "one needle" "two" "needle and needle" "")
+      (mega-test-write (expand-file-name "needle_dir/b.txt" dir) "needle here" "")
+      ;; A line of its own with what a terminal takes for a colour in it.
+      (mega-test-write (expand-file-name "c.txt" dir) "needle \e[1mbold\e[0m" "")
+      (mega-test-write (expand-file-name "d.txt" dir) "needle old" "")
+      (mega-search-test--git dir "init" "--quiet")
+      (mega-search-test--git dir "add" "--all")
+      (let ((files (mapcar (lambda (name) (expand-file-name name dir))
+                           '("a.txt" "needle_dir/b.txt" "c.txt" "d.txt")))
+            (inhibit-message t))
+        (unwind-protect
+            (save-window-excursion
+              (mega-search-results-buffer "needle" dir 'git)
+              ;; Changed since the search: line 1 is another line now.
+              (mega-test-write (nth 3 files) "changed since" "needle old" "")
+              (with-current-buffer "*mega-search*"
+                (should (eq (key-binding (kbd "e")) 'mega-search-edit-results))
+                (mega-search-edit-results)
+                (goto-char (point-min))
+                (replace-string "needle" "pin")
+                ;; The header is not a hit, nor is a file's name.
+                (should (string-prefix-p "Search for \"needle\"" (buffer-string)))
+                (should (string-search "needle_dir/b.txt:1:pin here" (buffer-string)))
+                (grep-edit-save-changes))
+              (should (equal (mega-test-buffer-string (get-file-buffer (nth 0 files)))
+                             "one pin\ntwo\npin and pin\n"))
+              (should (equal (mega-test-buffer-string (get-file-buffer (nth 1 files)))
+                             "pin here\n"))
+              ;; Changed in its buffer, not saved: C-x s is yours to press.
+              (should (buffer-modified-p (get-file-buffer (nth 0 files))))
+              (should (equal (with-temp-buffer (insert-file-contents (nth 0 files))
+                                               (buffer-string))
+                             "one needle\ntwo\nneedle and needle\n"))
+              ;; Neither line that is not what was found is touched.
+              (should (equal (mega-test-buffer-string (get-file-buffer (nth 2 files)))
+                             "needle \e[1mbold\e[0m\n"))
+              (should (equal (mega-test-buffer-string (get-file-buffer (nth 3 files)))
+                             "changed since\nneedle old\n")))
+          (dolist (file files)
+            (when-let* ((buffer (get-file-buffer file)))
+              (with-current-buffer buffer (set-buffer-modified-p nil))
+              (kill-buffer buffer)))
+          (when (get-buffer "*mega-search*")
+            (kill-buffer "*mega-search*")))))))
+
+(ert-deftest mega-search-hits-are-whole-in-the-buffer-of-hits ()
+  "ripgrep is told to cut a long line short for the prompt; edited in the
+buffer of hits, a line so cut would be cut short in its file."
+  (mega-search-test--defaults
+    (should (member "--max-columns=300" (mega-search-command 'rg "x" nil)))
+    (let ((mega-search--whole-lines t))
+      (should-not (seq-some (lambda (arg) (string-prefix-p "--max-columns" arg))
+                            (mega-search-command 'rg "x" nil))))
+    (let (whole)
+      (cl-letf (((symbol-function 'mega-search-run)
+                 (lambda (&rest _) (setq whole mega-search--whole-lines) nil))
+                ((symbol-function 'pop-to-buffer) #'ignore))
+        (mega-search-results-buffer "x" default-directory 'rg)
+        (kill-buffer "*mega-search*"))
+      (should whole))))
+
 (ert-deftest mega-search-without-any-program-says-what-to-do ()
   (cl-letf (((symbol-function 'mega-exec-find) (lambda (&rest _) nil)))
     (should-error (mega-search-project) :type 'user-error)))

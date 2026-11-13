@@ -39,7 +39,8 @@
 ;;   C-o w    match whole words only
 ;;   C-o b    switch to the next search program
 ;;   C-o d    search another directory, in the project or out of it
-;;   C-o e    put every hit in a buffer you can navigate and edit
+;;   C-o e    put every hit in a buffer you can navigate and edit: there
+;;            `e' and then M-% replaces in all of them, in their files
 ;;   C-o ?    list these keys
 ;;
 ;; And one key shows a hit without taking it:
@@ -92,6 +93,9 @@
 
 (require 'mega-project)
 (declare-function grep-mode "grep")
+(declare-function grep-change-to-grep-edit-mode "grep")
+(declare-function compilation--ensure-parse "compile")
+(defvar grep-mode-map)
 
 (defcustom mega-search-backend 'git
   "The program that searches the project: `git', `rg' or `grep'.
@@ -156,6 +160,10 @@ What the prompt names the directory by, wherever the search has moved.")
   "Directory names the active search passes over, unless it includes ignored files.
 Set for a project without version control: see `mega-project-left-out'.")
 (defvar mega-search--export nil "Set by `mega-search-export' as it leaves the prompt.")
+(defvar mega-search--whole-lines nil
+  "Non-nil to have every hit's line whole, as the buffer of hits needs it.
+An edited hit is written over its line in the file: a line cut short to
+be shown would be cut short in the file.")
 (defvar mega-search--note nil
   "Why the program in use cannot search the files the query asks for, or nil.
 The prompt says it: see `mega-search--source'.")
@@ -333,7 +341,7 @@ are passed as they are, never through a shell."
          ;; What matched is marked, in a way that is MEGA's and not that of
          ;; your settings for ripgrep: see `mega-search--marked'.
          "--color=always" "--colors=match:none" "--colors=match:style:bold"
-         "--max-columns=300" "--max-columns-preview"
+         ,@(unless mega-search--whole-lines '("--max-columns=300" "--max-columns-preview"))
          ,(if ignore-case "--ignore-case" "--case-sensitive")
          ,@(when mega-search-hidden '("--hidden" "--glob=!.git"))
          ;; Without a repository ripgrep reads no .gitignore unless told to.
@@ -753,27 +761,83 @@ and would take away a face it had not put there."
         (setq position next)))
     line))
 
+(defvar mega-search-results-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "e" #'mega-search-edit-results)
+    map)
+  "Keys of the buffer of hits, before those of `grep-mode'.")
+
 (defun mega-search-results-buffer (input directory backend)
   "Show every hit for INPUT under DIRECTORY in a buffer.
 The buffer is in `grep-mode': `n'/`p' and RET move between hits, and `e'
-makes them editable in place."
+makes them editable in place, which is how to replace in all of them:
+see `mega-search-edit-results'."
   (let ((hits (let ((mega-search--directory directory)
-                    (mega-search--backend backend))
+                    (mega-search--backend backend)
+                    (mega-search--whole-lines t))
                 (mega-search-run input directory backend 10000)))
         (buffer (get-buffer-create "*mega-search*")))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
         (setq default-directory (file-name-as-directory directory))
-        (insert (format "Search for \"%s\" in %s  (%s, %d hits)\n\n"
-                        input (abbreviate-file-name directory)
-                        (let ((mega-search--backend backend)) (mega-search-describe))
-                        (length hits)))
+        ;; Not a hit, and so not to be edited or replaced in with them.
+        (insert (propertize
+                 (concat (format "Search for \"%s\" in %s  (%s, %d hits)\n"
+                                 input (abbreviate-file-name directory)
+                                 (let ((mega-search--backend backend)) (mega-search-describe))
+                                 (length hits))
+                         "e edits the hits, and M-% then replaces in all of them;"
+                         " C-c C-c when done, and C-x s saves the files\n\n")
+                 'compilation-annotation t))
         (dolist (hit hits)
           (insert (mega-search--for-buffer hit) "\n")))
       (grep-mode)
+      (use-local-map (make-composed-keymap mega-search-results-map grep-mode-map))
       (goto-char (point-min)))
     (pop-to-buffer buffer)))
+
+(defun mega-search-edit-results ()
+  "Edit the hits in place: what changes in a hit changes in its file.
+M-% from the top then replaces in all of them; the files are changed,
+not saved, and C-x s saves them.  C-c C-c ends the editing.
+
+A hit is written over its line in the file.  So only a hit that is its
+line, as the file holds it now, can be edited: not one the file changed
+under since the search, nor one in which the program's colours could
+not be told from the line's own.  Those stay as they are, and are said."
+  (interactive)
+  ;; Emacs finds out where each hit is as it draws it; a hit it has not
+  ;; drawn yet would take no edit.
+  (compilation--ensure-parse (point-max))
+  (grep-change-to-grep-edit-mode)
+  (setq-local query-replace-skip-read-only t)
+  (let ((hits 0) (kept 0))
+    (with-silent-modifications
+      (save-excursion
+        (goto-char (point-min))
+        (while (not (eobp))
+          (when-let* ((targets (get-text-property (point) 'occur-target))
+                      (marker (car (car targets)))
+                      ((markerp marker))
+                      ((buffer-live-p (marker-buffer marker))))
+            (let* ((start (next-single-property-change (point) 'occur-prefix nil (pos-eol)))
+                   (hit (buffer-substring-no-properties start (pos-eol)))
+                   (line (with-current-buffer (marker-buffer marker)
+                           (save-excursion
+                             (goto-char marker)
+                             (buffer-substring-no-properties (pos-bol) (pos-eol))))))
+              (setq hits (1+ hits))
+              (unless (equal hit line)
+                (setq kept (1+ kept))
+                (add-text-properties start (pos-eol)
+                                     '(read-only t font-lock-face shadow)))))
+          (forward-line 1))))
+    (message "%s  M-%% replaces in them, C-c C-c ends, C-x s saves the files"
+             (if (zerop kept)
+                 (format "Editing %d hits." hits)
+               (format "Editing %d of %d hits; %d, greyed, are not their line in the file now."
+                       (- hits kept) hits kept)))))
 
 ;;;; The commands
 

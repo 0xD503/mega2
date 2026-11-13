@@ -164,6 +164,8 @@ keymap in step.")
      ("C-o d" mega-search-choose-directory "Search another directory, in the project or out of it")
      ("C-o e" mega-search-export           "Leave the prompt and put every hit in a buffer")
      ("C-o ?" mega-search-show-keys        "List these keys; how the search is set is in the prompt"))
+    ("In the buffer of search hits, from C-o e" mega-search-results-map mega-search
+     ("e" mega-search-edit-results "Edit the hits in place; M-% then replaces in all of them"))
     ("In the undo tree" mega-undo-tree-mode-map mega-undo-tree
      ("b, <left>, C-b"  mega-undo-tree-backward        "The older state this one was made from")
      ("f, <right>, C-f" mega-undo-tree-forward         "The newer state made from this one")

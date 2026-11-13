@@ -173,6 +173,14 @@ searched from, its line in the middle and marked, with the prompt still open,
 so you can go down the list and look at the next. `C-g` then leaves
 everything as it was, and closes a file that was opened only to be shown.
 
+**Replacing in the whole project.** Search for it with `M-g a`, then
+`C-o e` puts every hit in a buffer. There `e` makes the hits editable, and
+`M-%` from the top replaces in all of them, asking at each one (`!` for all
+the rest); each change goes to its file at once. `C-c C-c` ends the
+editing, and `C-x s` saves the files that changed. Only a hit that is still
+its line in the file can be edited: one in a file changed since the search
+is greyed and left as it is, as editing it would write over another line.
+
 `Up` brings back what you searched for before, as in a shell, and `Down`
 goes forward again, to what you were typing; `C-n` and `C-p` go through the
 hits. The history keeps the queries you typed, never the hits, which are

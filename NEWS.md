@@ -8,6 +8,13 @@ is then tagged in git as `vX.Y.Z`.
 
 ## Not yet released
 
+- Replacing in the whole project works, and the README says how: `M-g a`,
+  `C-o e`, then `e` and `M-%`; the buffer of hits says it too. Before,
+  `M-%` from the top changed the line that names the search and stopped
+  there, and a hit Emacs had not drawn yet took no change. A hit is now
+  editable only if it is its line in the file as it is: one in a file
+  that changed since the search, or one whose line was cut short or held
+  escape codes, would have been written over the line in the file.
 - The search can leave files out: after ` -- `, `!vendor` leaves out
   every directory or file called `vendor`, and `!/vendor` only the one
   right in the directory searched. Names to search follow the same rules,
