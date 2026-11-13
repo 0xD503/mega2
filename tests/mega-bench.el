@@ -728,6 +728,57 @@ each of them opens; the cursor is put there, and the buffer is returned."
            (kill-buffer buffer))))))
  :kind 'process)
 
+(defun mega-bench--committed-file ()
+  "A committed file of 2000 lines, in a repository of its own."
+  (let* ((default-directory (mega-bench--directory "bench-changes-"))
+         (file (expand-file-name "long.txt"))
+         (process-environment (append '("GIT_CONFIG_GLOBAL=/dev/null"
+                                        "GIT_CONFIG_NOSYSTEM=1")
+                                      process-environment)))
+    (with-temp-file file
+      (dotimes (line 2000)
+        (insert (format "line %d of a long file\n" line))))
+    (dolist (arguments '(("init" "--quiet") ("add" "long.txt")
+                         ("-c" "user.name=Bench" "-c" "user.email=bench@example.invalid"
+                          "-c" "commit.gpgsign=false" "commit" "--quiet" "-m" "Long")))
+      (unless (eql 0 (apply #'call-process "git" nil nil nil arguments))
+        (error "git %s failed" arguments)))
+    file))
+
+(mega-bench-define
+ "what changed since the commit: ask git and mark, a long file, five times"
+ (lambda ()
+   (require 'mega-changes)
+   (if (not (executable-find "git"))
+       (lambda () '(:skip "git is not installed"))
+     (let ((buffer (find-file-noselect (mega-bench--committed-file))))
+       ;; Forty lines changed, not saved, as git is asked about while typing.
+       (with-current-buffer buffer
+         (mega-changes-mode 1)
+         (dotimes (change 40)
+           (goto-char (point-min))
+           (forward-line (* change 50))
+           (end-of-line)
+           (insert " changed")))
+       (lambda ()
+         (unwind-protect
+             (with-current-buffer buffer
+               (dotimes (_ 5)
+                 (goto-char (point-max))
+                 (insert "one more line\n")
+                 (mega-changes--ask)
+                 ;; No sooner and no later than git has answered twice.
+                 (let ((deadline (+ (float-time) 20)))
+                   (while (and mega-changes--process (< (float-time) deadline))
+                     (accept-process-output nil 0.005)))
+                 (when mega-changes--process
+                   (error "git did not answer"))
+                 (unless (eql mega-changes--drawn (buffer-chars-modified-tick))
+                   (error "Nothing is marked"))))
+           (with-current-buffer buffer (set-buffer-modified-p nil))
+           (kill-buffer buffer))))))
+ :kind 'process)
+
 (mega-bench-define
  "save a file after a small edit, ten times"
  (lambda ()

@@ -195,11 +195,12 @@ where a task runs again, or `cd` Eshell.
 | Small helpers | Indent guides, TODO highlight, symbol jump, `C-a` to the text of the line and then its start, trim changed lines, clipboard bridge |
 | Which block you are in | A line above the text names the lines that open the blocks around the cursor, once they are out of sight, and goes away when they are not. From indentation alone: the nearest line above that is indented less, and so on outward. Comments, the inside of strings, and in C the preprocessor and labels are passed over; a line that only closes a list of arguments gives way to the line that began it |
 | Who changed this line | At the end of the line the cursor rests on: who, how long ago, in which change. git is asked about that one line when Emacs is idle, in the background, about the text on screen whether saved or not, and with `--no-textconv`, without which it runs a converter the repository can name |
+| What changed since the last commit | A mark in the margin beside each line not as committed: added, changed, or where lines were taken out, in the theme's colours; keys to go from one change to the next, to see one, and to put one back. git is given the buffer's text on its input, saved or not, and never a file of the project by name, which would run a filter the repository names; the committed text, from `git cat-file`, is in a file of MEGA's private cache for as long as git compares. The margin is made wide enough for Flymake's marks as well, which Flymake would otherwise narrow again at each check |
 | Modes | Markdown, Zig, justfile, Rust fallback |
 
 ### Not in 2.0
 
-Spell and grammar checking; Git UI or margin marks; icons; kitty keyboard
+Spell and grammar checking; a Git UI of MEGA's own (Emacs's `C-x v` is it); icons; kitty keyboard
 protocol; multiple cursors; an API-key LLM client; Dev Container Features and
 compose without the official CLI; RON mode; anything GUI-specific.
 

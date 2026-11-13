@@ -927,6 +927,58 @@ ${line%%:*}: the cursor is on '${at#* }'"
             git -c user.name=Ada -c user.email=ada@example.invalid \
                 -c commit.gpgsign=false commit --quiet -m 'A note'
     ) || { bad "terminal  on the grid: could not make a repository to look at"; return; }
+
+    # Seven: in a file git keeps, a line changed since the commit is marked
+    # in the margin, beside its number, while it is not saved; and the text
+    # of every line still begins in the same column.
+    kept="$SANDBOX/grid/kept"
+    mkdir -- "$kept"
+    printf 'first\nsecond\nthird\n' > "$kept/kept.txt"
+    (
+        cd -- "$kept" &&
+            GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 &&
+            export GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM &&
+            git init --quiet &&
+            git add kept.txt &&
+            git -c user.name=Ada -c user.email=ada@example.invalid \
+                -c commit.gpgsign=false commit --quiet -m 'Kept'
+    ) || { bad "terminal  on the grid: could not make a repository to look at"; return; }
+    if ! grid_start "$kept/kept.txt" 8 '(setq mega-trust-ask-on-open nil mega-blame nil)' ||
+        ! grid_wait 'kept.txt' 150; then
+        bad "terminal  on the grid of $version: Emacs did not come up on a file"
+        grid kill-server 2>/dev/null
+        return
+    fi
+    grid send-keys -t grid C-n C-e '!'
+    mark=$(printf '\342\226\216')
+    tries=0
+    while [ "$tries" -lt 50 ]; do
+        rows=$(grid capture-pane -p -t grid | sed -n 1,3p)
+        case $(printf '%s\n' "$rows" | sed -n 2p) in "$mark"*'second!'*) break ;; esac
+        tries=$((tries + 1))
+        sleep 0.1
+    done
+    grid kill-server 2>/dev/null
+    # The mark is three bytes, and a shell counts bytes: one, to measure.
+    one=$(printf '%s\n' "$rows" | sed -n 1p | sed "s/$mark/|/g")
+    two=$(printf '%s\n' "$rows" | sed -n 2p | sed "s/$mark/|/g")
+    three=$(printf '%s\n' "$rows" | sed -n 3p | sed "s/$mark/|/g")
+    before_one=${one%%first*}
+    before_two=${two%%second*}
+    before_three=${three%%third*}
+    if [ "$tries" -lt 50 ] && [ "${#before_one}" -eq "${#before_two}" ] &&
+        [ "${#before_two}" -eq "${#before_three}" ]; then
+        case $one$three in
+            *"|"*)
+                bad "terminal  on the grid of $version: a line not changed is marked"
+                printf '%s\n' "$rows" | cut -c1-200 | detail ;;
+            *) ok "terminal  on the grid of $version: a line changed since the commit is marked beside its number" ;;
+        esac
+    else
+        bad "terminal  on the grid of $version: a changed line is not marked, or the text moved"
+        printf '%s\n' "$rows" | cut -c1-200 | detail
+    fi
+
     if ! grid_start "$repo/notes.txt" 12 '(setq mega-trust-ask-on-open nil)' ||
         ! grid_wait 'notes.txt' 150; then
         bad "terminal  on the grid of $version: Emacs did not come up on a file"

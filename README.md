@@ -144,6 +144,19 @@ change; a line you have changed since says `not committed yet`. `M-x
 mega-blame-mode` switches that off in a buffer, `(setq mega-blame nil)` in
 `local.el` everywhere.
 
+**What changed since the last commit.** In a file that git keeps, a mark in
+the margin, beside the line numbers, shows each line that is not as it was
+committed: green for added, yellow for changed, and red where lines were
+taken out. The marks follow the text as you type, saved or not. `C-x v ]`
+and `C-x v [` go to the next and the previous change, `C-x v *` shows one
+as it was and as it is, and `C-x v n` puts it back as committed (`C-/`
+undoes that). Emacs's own git keys are there too: `C-x v =` every change of
+the file, `C-x v l` its history, `C-x v d` the state of the project, `C-x v
+v` commit. In a file with a merge conflict Emacs marks each one: `C-c ^ n`
+and `C-c ^ p` go from one to the next, `C-c ^ u` keeps your side, `C-c ^ l`
+theirs and `C-c ^ a` both. `(setq mega-changes nil)` in `local.el` leaves
+the margin empty.
+
 The mouse works in the terminal: click, scroll, hover for a hint. Selecting
 text with the terminal itself then needs Shift held down; `(setq mega-mouse
 nil)` in `local.el` gives the mouse back to the terminal.

@@ -8,6 +8,15 @@ is then tagged in git as `vX.Y.Z`.
 
 ## Not yet released
 
+- In a file that git keeps, the lines changed since the last commit are
+  marked in the margin, beside the line numbers: added, changed, and where
+  lines were taken out, as you type. `C-x v ]` and `C-x v [` go from one
+  change to the next, `C-x v *` shows one, `C-x v n` puts it back. The
+  cheat sheet lists Emacs's own git keys with them, and the README how a
+  merge conflict is resolved.
+- "Who changed this line" no longer asks git again and again about a file
+  it cannot blame where your language is not English: git's answer was
+  looked for in English, and it says it in yours.
 - `M-g I` goes to a definition anywhere in the project: type part of its
   name, and the language server lists the functions, types and constants
   it finds, with what each is and where, as you type. `M-,` comes back,

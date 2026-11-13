@@ -118,6 +118,26 @@
 ;; The largest unsaved buffer, in characters, that git is given to read.
 ;; (setq mega-blame-max-size 2000000)
 
+;;;; What changed since the last commit
+
+;; Whether a file that git keeps marks its changed lines in the margin.  Nil
+;; switches that off everywhere; `M-x mega-changes-mode' still turns it on in
+;; one buffer.
+;; (setq mega-changes t)
+
+;; Seconds Emacs has to be idle after a change before git is asked.
+;; (setq mega-changes-delay 0.5)
+
+;; Seconds after which git is asked again about a buffer that did not change.
+;; That is how a commit made outside Emacs comes to show.
+;; (setq mega-changes-recheck 10)
+
+;; Seconds after which a question to git about the changes is given up.
+;; (setq mega-changes-timeout 5)
+
+;; No marks are shown in a buffer with more characters than this.
+;; (setq mega-changes-max-size 2000000)
+
 ;;;; Undo
 
 ;; Non-nil to show what an undo did.  The text it put back is marked for

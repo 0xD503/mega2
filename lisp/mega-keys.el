@@ -71,6 +71,16 @@
      ("C-c f"   mega-fold-toggle     "Fold or unfold the block the cursor is in" :code)
      ("C-c F"   mega-fold-all        "Fold every block, or unfold everything" :code)
      ("C-x u"   mega-undo-tree       "The undo history as a tree: every state the text was in"))
+    ("Git"
+     ("C-x v ]" mega-changes-next     "The next line changed since the last commit")
+     ("C-x v [" mega-changes-previous "The previous one")
+     ("C-x v *" mega-changes-show     "What changed there: the lines as committed, and now")
+     ("C-x v n" mega-changes-revert   "Put that change back as committed; C-/ undoes it")
+     ("C-x v =" vc-diff               "Every change of this file since the last commit")
+     ("C-x v u" vc-revert             "Put the whole file back as committed")
+     ("C-x v l" vc-print-log          "The history of this file")
+     ("C-x v d" vc-dir                "The state of the project: what changed, what is new")
+     ("C-x v v" vc-next-action        "Commit, or the next step for this file"))
     ("Code"
      ("C-c d"   mega-doc-buffer   "Documentation for the thing at point, in a side window")
      ("C-c D"   mega-doc-popup    "The same, in a popup")

@@ -249,7 +249,10 @@ That is what git has to be given in place of the file."
     (when (or (not modified) input)
       (setq mega-blame--process
             (condition-case nil
-                (mega-exec-start
+                ;; In English: what git says when it cannot is looked at
+                ;; below, and it says it in your locale's language otherwise.
+                (let ((process-environment (cons "LC_ALL=C" process-environment)))
+                 (mega-exec-start
                  "git" (mega-blame-arguments (file-name-nondirectory file)
                                              line (and input t))
                  :directory (file-name-directory file)
@@ -257,7 +260,7 @@ That is what git has to be given in place of the file."
                  :local t
                  :input input
                  :then (lambda (result)
-                         (mega-blame--answer buffer tick line result)))
+                         (mega-blame--answer buffer tick line result))))
               ;; No git: then there is nothing to ask, here or anywhere.
               (error (setq mega-blame--not-here t) nil)))
       (when mega-blame--process

@@ -332,6 +332,34 @@ on in one buffer."
 
 (add-hook 'find-file-hook #'mega-edit--blame)
 
+;;;; The lines changed since the last commit
+;;
+;; The mode itself is in mega-changes.el and loads with the first file
+;; that git keeps.
+
+(defcustom mega-changes t
+  "Whether a file that git keeps marks its changed lines in the margin.
+Nil switches that off everywhere; `M-x mega-changes-mode' still turns it
+on in one buffer."
+  :type 'boolean :group 'mega)
+
+(autoload 'mega-changes-mode "mega-changes" nil t)
+(declare-function vc-backend "vc-hooks")
+
+(defun mega-edit--changes ()
+  "Turn `mega-changes-mode' on in a buffer that visits a file git keeps.
+What Emacs found out when it opened the file says so; nothing is run.
+Not for a file MEGA counts as private, nor one on another machine."
+  (when (and mega-changes
+             buffer-file-name
+             (not (file-remote-p buffer-file-name))
+             (not (mega-private-file-p buffer-file-name))
+             (eq (vc-backend buffer-file-name) 'Git))
+    (mega-changes-mode 1)))
+
+;; After Emacs's own, which finds out which version control keeps the file.
+(add-hook 'find-file-hook #'mega-edit--changes 90)
+
 ;;;; The block you are in
 ;;
 ;; The mode itself is in mega-context.el and loads with the first code
