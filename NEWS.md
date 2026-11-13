@@ -6,7 +6,7 @@ and MAJOR stays 2 until MEGA is made over again. What is done meanwhile is
 under "Not yet released" until there is enough of it for a version, which
 is then tagged in git as `vX.Y.Z`.
 
-## Not yet released
+## 2.5.0 — 2026-11-13
 
 - In a file that git keeps, the lines changed since the last commit are
   marked in the margin, beside the line numbers: added, changed, and where
@@ -14,9 +14,6 @@ is then tagged in git as `vX.Y.Z`.
   change to the next, `C-x v *` shows one, `C-x v n` puts it back. The
   cheat sheet lists Emacs's own git keys with them, and the README how a
   merge conflict is resolved.
-- "Who changed this line" no longer asks git again and again about a file
-  it cannot blame where your language is not English: git's answer was
-  looked for in English, and it says it in yours.
 - `M-g I` goes to a definition anywhere in the project: type part of its
   name, and the language server lists the functions, types and constants
   it finds, with what each is and where, as you type. `M-,` comes back,
@@ -47,20 +44,23 @@ is then tagged in git as `vX.Y.Z`.
   On it, it stays an `s`, highlighted as `@` is. Moving about the tree no
   longer loses which state that is: once it was lost, getting back to the
   saved text, by the tree or by `C-/`, left the buffer marked as changed.
-- In a prompt for a file, Backspace deletes one character, as anywhere
-  else; after a `/` it deleted the whole directory name before it, and on
-  `~/` it spelled out your home directory and deleted its last part.
-  `M-Backspace` deletes a word, as before.
-- The mouse wheel scrolls the text, three lines a notch, in an Emacs built
-  without X (`emacs-nox`). Before, a notch said "<wheel-up> is undefined"
-  until something such as a language server had loaded the wheel's keys.
-- In the search prompt, what you type or delete is on the screen at once,
-  while the search is still at work. In a tree as large as Linux a search
-  takes seconds, and `M-Backspace` left the word in sight until it was done.
 - `M-g a` starts from the word the cursor is right behind as well, as it
   is once you have typed the word; before, only from the one it was on.
 - The word `M-g a` starts from is no longer selected: what you type is
   added to it, without moving the cursor first. `C-a C-k` clears it.
+- In a prompt for a file, Backspace deletes one character, as anywhere
+  else; after a `/` it deleted the whole directory name before it, and on
+  `~/` it spelled out your home directory and deleted its last part.
+  `M-Backspace` deletes a word, as before.
+- In the search prompt, what you type or delete is on the screen at once,
+  while the search is still at work. In a tree as large as Linux a search
+  takes seconds, and `M-Backspace` left the word in sight until it was done.
+- The mouse wheel scrolls the text, three lines a notch, in an Emacs built
+  without X (`emacs-nox`). Before, a notch said "<wheel-up> is undefined"
+  until something such as a language server had loaded the wheel's keys.
+- "Who changed this line" no longer asks git again and again about a file
+  it cannot blame where your language is not English: git's answer was
+  looked for in English, and it says it in yours.
 - The tests no longer reach your desktop: a test that killed text in a
   terminal Emacs gave it to your clipboard, in place of what you had copied.
 
