@@ -26,6 +26,10 @@ Completions, for whatever is being typed:
 
 A line containing BUG gets a diagnostic.  Formatting strips the spaces at
 the ends of lines and squeezes runs of spaces inside them.
+
+The symbols of the project are every `fn NAME' in the documents it was
+given and in far.rs beside them, which it was not; one in far.rs is given
+without its place, which it says when asked to resolve it.
 """
 
 import json
@@ -129,6 +133,60 @@ def formatted(uri):
              "newText": new}]
 
 
+def utf16(text):
+    """How long TEXT is in the units the protocol counts columns in."""
+    return len(text.encode("utf-16-le")) // 2
+
+
+def functions(uri, text, query):
+    """The `fn NAME' in TEXT whose name contains QUERY, as symbols."""
+    found = []
+    for number, line in enumerate(text.split("\n")):
+        for match in re.finditer(r"\bfn (\w+)", line):
+            name = match.group(1)
+            if query.lower() not in name.lower():
+                continue
+            start = utf16(line[:match.start(1)])
+            found.append({
+                "name": name, "kind": 12, "containerName": "fake",
+                "location": {"uri": uri, "range": {
+                    "start": {"line": number, "character": start},
+                    "end": {"line": number, "character": start + utf16(name)}}}})
+    return found
+
+
+def far(uri):
+    """The URI of far.rs, beside the document URI."""
+    return uri.rsplit("/", 1)[0] + "/far.rs"
+
+
+def symbols(query):
+    """The project's symbols whose names contain QUERY."""
+    found = []
+    for uri, text in DOCUMENTS.items():
+        found += functions(uri, text, query)
+    if DOCUMENTS:
+        path = far(next(iter(DOCUMENTS))).replace("file://", "", 1)
+        if os.path.exists(path):
+            with open(path) as handle:
+                for symbol in functions("file://" + path, handle.read(), query):
+                    # Where in the file is said when asked.
+                    symbol["location"] = {"uri": symbol["location"]["uri"]}
+                    symbol["data"] = symbol["name"]
+                    found.append(symbol)
+    return found
+
+
+def resolved(symbol):
+    """SYMBOL with its place in the file."""
+    path = symbol["location"]["uri"].replace("file://", "", 1)
+    with open(path) as handle:
+        for found in functions(symbol["location"]["uri"], handle.read(), symbol["data"]):
+            if found["name"] == symbol["data"]:
+                return found
+    return symbol
+
+
 def main():
     log = os.environ.get("MEGA_TEST_LSP_LOG")
     hang = os.environ.get("MEGA_TEST_LSP_HANG")
@@ -165,6 +223,7 @@ def main():
                     "completionProvider": {},
                     "hoverProvider": True,
                     "documentFormattingProvider": True,
+                    "workspaceSymbolProvider": {"resolveProvider": True},
                 },
                 "serverInfo": {"name": "mega-fake-server"},
             })
@@ -191,6 +250,10 @@ def main():
             reply(message, complete(params, snippets))
         elif method == "textDocument/hover":
             reply(message, {"contents": "Documentation from the fake server"})
+        elif method == "workspace/symbol":
+            reply(message, symbols(params.get("query", "")))
+        elif method == "workspaceSymbol/resolve":
+            reply(message, resolved(params))
         elif method == "textDocument/formatting":
             reply(message, formatted(params["textDocument"]["uri"]))
         elif method == "shutdown":

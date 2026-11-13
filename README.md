@@ -109,6 +109,7 @@ lists what can follow.
 | `M-g a` | Search the project as you type (`M-g s`: the symbol at point; `C-u` first: a directory you choose) |
 | `C-c t` | Show or hide the file tree |
 | `M-.` | Go to the definition (`M-,` goes back, `M-?` lists the uses) |
+| `M-g I` | Go to a definition anywhere in the project: type part of its name (`M-g i`: in this buffer) |
 | `C-c d` | Documentation for the thing at point |
 | `C-c c r` | Rename everywhere (`C-c c a`: fixes, `C-c c f`: format) |
 | `C-c c n` | Next problem (`C-c c e`: list them) |
@@ -183,7 +184,9 @@ is greyed and left as it is, as editing it would write over another line.
 
 `Up` brings back what you searched for before, as in a shell, and `Down`
 goes forward again, to what you were typing; `C-n` and `C-p` go through the
-hits. The history keeps the queries you typed, never the hits, which are
+hits. The same goes for `M-g I`, which finds a function, a type or a
+constant anywhere in the project as you type its name: the language server
+looks it up, and `M-,` comes back. The history keeps the queries you typed, never the hits, which are
 lines of your files.
 
 The prompt says how it searches: `[git  case:smart]` is git grep, case

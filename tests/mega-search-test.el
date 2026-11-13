@@ -740,11 +740,21 @@ They are in the prompt now, for as long as it is open."
 (ert-deftest mega-search-the-arrows-go-through-what-was-searched-for ()
   "Asked for after use.  C-n and C-p are left to go through the hits."
   (dolist (key '("<up>" "M-p"))
-    (should (eq (lookup-key mega-search-map (kbd key)) 'mega-pick-history-previous)))
+    (should (eq (lookup-key mega-pick-history-map (kbd key)) 'mega-pick-history-previous)))
   (dolist (key '("<down>" "M-n"))
-    (should (eq (lookup-key mega-search-map (kbd key)) 'mega-pick-history-next)))
+    (should (eq (lookup-key mega-pick-history-map (kbd key)) 'mega-pick-history-next)))
   (dolist (key '("C-n" "C-p"))
-    (should-not (lookup-key mega-search-map (kbd key)))))
+    (should-not (lookup-key mega-pick-history-map (kbd key)))
+    (should-not (lookup-key mega-search-map (kbd key))))
+  ;; The search prompt is one with a history.
+  (let (history)
+    (cl-letf (((symbol-function 'mega-pick-read)
+               (lambda (&rest arguments) (setq history (plist-get (cddr arguments) :history))
+                 "zz"))
+              ((symbol-function 'mega-search-backend-for) (lambda (_) 'grep)))
+      (let ((inhibit-message t))
+        (mega-search-project)))
+    (should (eq history 'mega-search-history))))
 
 (ert-deftest mega-search-history-loses-the-hits-an-older-mega-kept ()
   "It kept the hit taken, a line of one of your files, and on disk."

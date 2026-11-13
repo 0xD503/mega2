@@ -201,6 +201,64 @@ A note is a plist; false is `:false' and null is nil."
           (should (equal (buffer-substring (region-beginning) (region-end)) "second")))
       (mega-snippet-finish))))
 
+;;;; A symbol anywhere in the project
+
+(ert-deftest mega-lsp-a-symbol-of-the-project-is-found-as-you-type ()
+  "Asked for: M-g I, the project's definitions, as M-g i is the buffer's."
+  (mega-lsp-integration-test--session
+      ('("const S: &str = \"😀\"; fn after_emoji() {}" "fn main() {}" "fn helper_one() {}" "")
+       (mega-test-write (expand-file-name "far.rs" project)
+                        "// far away" "" "fn helper_far() {}" ""))
+    (should (eq (key-binding (kbd "M-g I")) 'mega-lsp-project-symbol))
+    (let ((origin (current-buffer))
+          (mega-test-prompt-log nil)
+          (mega-lsp-symbol-history nil))
+      (unwind-protect
+          (progn
+            ;; Each with what it is, what it is in and where: a file that is
+            ;; open, and one that is not, of which the server says only which.
+            (goto-char (point-max))
+            (mega-test-with-scripted-prompt "helper"
+              (mega-lsp-project-symbol))
+            (should (equal (cdr (car mega-test-prompt-log))
+                           '("helper_one  function in fake  main.rs:3"
+                             "helper_far  function in fake  far.rs")))
+            (should (eq (current-buffer) origin))
+            (should (looking-at "helper_one"))
+            ;; M-, comes back.
+            (xref-go-back)
+            (should (= (point) (point-max)))
+            ;; The other file, at the place the server says when asked.
+            (mega-test-with-scripted-prompt "helper_far"
+              (mega-lsp-project-symbol))
+            (should (equal buffer-file-name (expand-file-name "far.rs" project)))
+            (should (= (line-number-at-pos) 3))
+            (should (looking-at "helper_far"))
+            (switch-to-buffer origin)
+            ;; A column after an emoji: two units to the server, one to Emacs.
+            (mega-test-with-scripted-prompt "after_emoji"
+              (mega-lsp-project-symbol))
+            (should (looking-at "after_emoji"))
+            ;; A prompt with a history, which keeps what was typed and which
+            ;; the arrows go through: see the tests of mega-pick.
+            (let (history)
+              (cl-letf (((symbol-function 'mega-pick-read)
+                         (lambda (&rest arguments)
+                           (setq history (plist-get (cddr arguments) :history))
+                           "")))
+                (mega-lsp-project-symbol))
+              (should (eq history 'mega-lsp-symbol-history))))
+        (when-let* ((far (get-file-buffer (expand-file-name "far.rs" project))))
+          (kill-buffer far))))))
+
+(ert-deftest mega-lsp-without-a-server-the-project-s-symbols-say-why ()
+  (mega-test-with-directory dir
+    (let ((default-directory dir))
+      (with-temp-buffer
+        (should (string-match-p
+                 "C-c y"
+                 (cadr (should-error (mega-lsp-project-symbol) :type 'user-error))))))))
+
 ;;;; Diagnostics
 
 (ert-deftest mega-lsp-the-server-s-diagnostics-reach-the-buffer ()

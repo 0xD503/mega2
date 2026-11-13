@@ -666,13 +666,6 @@ How it works at the moment is in the prompt."
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-o") mega-search-options-map)
     (define-key map (kbd "C-j") #'mega-search-preview)
-    ;; The arrows go through what was searched for, as in a shell; C-n and
-    ;; C-p still go through the hits.  M-p and M-n are Emacs's keys for the
-    ;; same, which past the newest would ask the search for every line.
-    (dolist (key '("<up>" "M-p"))
-      (define-key map (kbd key) #'mega-pick-history-previous))
-    (dolist (key '("<down>" "M-n"))
-      (define-key map (kbd key) #'mega-pick-history-next))
     map)
   "Extra keys of the search prompt.")
 

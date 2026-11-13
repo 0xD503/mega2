@@ -14,6 +14,8 @@
 ;;   C-c c h           call hierarchy        C-c c o   organise imports
 ;;   C-c c n / p       next / previous problem
 ;;   C-c c e / E       list the problems of the buffer / the project
+;;   M-g i / I         go to a definition in this buffer / in the project,
+;;                     the project's as you type: the server looks it up
 ;;
 ;; A server is started only when its program exists, so a machine without
 ;; one simply has no server: no error, no prompt.
@@ -45,6 +47,16 @@
 (defvar eldoc-echo-area-display-truncation-message)
 (defvar eldoc-documentation-strategy)
 (defvar eldoc-display-functions)
+
+(declare-function eglot-current-server "eglot")
+(declare-function eglot-server-capable "eglot")
+(declare-function eglot-uri-to-path "eglot")
+(declare-function eglot-range-region "eglot")
+(declare-function jsonrpc-request "jsonrpc")
+(declare-function mega-pick-read "mega-pick")
+(declare-function mega-project-directory "mega-project")
+(declare-function xref-push-marker-stack "xref")
+(defvar mega-pick-abandoned)
 
 ;;;; eglot
 
@@ -162,6 +174,107 @@ included, so they are put back on top of whatever the project said."
 
 (setq xref-search-program (if (mega-exe-p "rg") 'ripgrep 'grep)
       xref-history-storage 'xref-window-local-history)
+
+;;;;; A symbol anywhere in the project
+
+(defvar mega-lsp-symbol-history nil "What was typed to find a symbol of the project.")
+
+(defconst mega-lsp--symbol-kinds
+  ["file" "module" "namespace" "package" "class" "method" "property" "field"
+   "constructor" "enum" "interface" "function" "variable" "constant" "string"
+   "number" "boolean" "array" "object" "key" "null" "enum member" "struct"
+   "event" "operator" "type parameter"]
+  "What a kind of symbol is called, by the number the protocol gives it, from 1.")
+
+(defun mega-lsp--no-server ()
+  "Why the current buffer has no language server to ask, as a sentence."
+  (if (mega-trust-p default-directory)
+      "No language server runs for this buffer: M-x mega-doctor says which are installed"
+    "This project is not trusted, and so runs no language server: C-c y trusts it"))
+
+(defun mega-lsp--symbol-line (symbol root)
+  "SYMBOL, as the server describes one, as a line of the list.
+Its name, what it is, what it is in, and where: the file from ROOT, the
+project's directory, and the line, if the server said which."
+  (let* ((location (plist-get symbol :location))
+         (file (eglot-uri-to-path (plist-get location :uri)))
+         (line (plist-get (plist-get (plist-get location :range) :start) :line))
+         (kind (plist-get symbol :kind))
+         (container (plist-get symbol :containerName)))
+    (concat (plist-get symbol :name)
+            (propertize
+             (concat "  " (if (and (integerp kind) (<= 1 kind (length mega-lsp--symbol-kinds)))
+                              (aref mega-lsp--symbol-kinds (1- kind))
+                            "symbol")
+                     (if (and (stringp container) (not (string-empty-p container)))
+                         (concat " in " container)
+                       ""))
+             'face 'shadow)
+            "  "
+            (propertize (concat (if (and root (file-in-directory-p file root))
+                                    (file-relative-name file root)
+                                  (abbreviate-file-name file))
+                                (if (integerp line) (format ":%d" (1+ line)) ""))
+                        'face 'xref-file-header))))
+
+(defun mega-lsp--symbols (server input found root)
+  "The lines for what SERVER finds for INPUT, each noted in FOUND, a table.
+FOUND takes a line to the symbol it stands for.  ROOT is the project's
+directory.  Asked only from two characters on; and given up as soon as
+a key is pressed, which a request to a server does not do by itself."
+  (if (< (length input) 2)
+      nil
+    (let ((answer (jsonrpc-request server :workspace/symbol (list :query input)
+                                   :cancel-on-input t
+                                   :cancel-on-input-retval mega-pick-abandoned)))
+      (if (eq answer mega-pick-abandoned)
+          answer
+        (mapcar (lambda (symbol)
+                  (let ((line (mega-lsp--symbol-line symbol root)))
+                    (puthash (substring-no-properties line) symbol found)
+                    line))
+                answer)))))
+
+(defun mega-lsp--go-to-symbol (server symbol)
+  "Go to SYMBOL, as SERVER describes one: its file, and in it its place.
+A server may leave out where in the file, to say it when asked."
+  (let ((location (plist-get symbol :location)))
+    (when (and (null (plist-get location :range))
+               (eglot-server-capable :workspaceSymbolProvider :resolveProvider))
+      (setq location (plist-get (jsonrpc-request server :workspaceSymbol/resolve symbol)
+                                :location)))
+    (xref-push-marker-stack)
+    (find-file (eglot-uri-to-path (plist-get location :uri)))
+    (if-let* ((range (plist-get location :range)))
+        (goto-char (car (eglot-range-region range)))
+      (goto-char (point-min)))))
+
+;;;###autoload
+(defun mega-lsp-project-symbol ()
+  "Go to a definition anywhere in the project: type its name, or part of it.
+The language server of this buffer looks it up as you type, in the whole
+project, and lists functions, types, constants and the rest with what
+they are and where.  `M-,' comes back.  `M-g i' is the same in this
+buffer alone."
+  (interactive)
+  (require 'eglot)
+  (require 'mega-pick)
+  (let ((server (eglot-current-server)))
+    (unless server
+      (user-error "%s" (mega-lsp--no-server)))
+    (unless (eglot-server-capable :workspaceSymbolProvider)
+      (user-error "This language server cannot look up the symbols of the project"))
+    (let* ((found (make-hash-table :test #'equal))
+           ;; Named from where the search names files from.
+           (root (expand-file-name (mega-project-directory)))
+           (choice (mega-pick-read "Go to a symbol of the project: "
+                                   (lambda (input) (mega-lsp--symbols server input found root))
+                                   :category 'mega-lsp-symbol
+                                   :history 'mega-lsp-symbol-history))
+           (symbol (gethash choice found)))
+      (if symbol
+          (mega-lsp--go-to-symbol server symbol)
+        (message "No symbol chosen")))))
 
 ;;;; Documentation
 ;;

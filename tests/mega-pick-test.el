@@ -86,6 +86,23 @@
     (should (equal (all-completions "" table (lambda (c) (equal c "keep")))
                    '("keep")))))
 
+(ert-deftest mega-pick-a-source-that-gave-up-is-asked-again ()
+  "A request to a language server gives up when a key is pressed.  An
+answer of nothing remembered for it would be listed when the same text
+is there again."
+  (let* ((asked 0)
+         (table (car (mega-pick-table
+                      (lambda (input)
+                        (setq asked (1+ asked))
+                        (if (= asked 1) mega-pick-abandoned (list (concat input "!"))))
+                      'mega-pick))))
+    (should-not (all-completions "ab" table))
+    (should (equal (all-completions "ab" table) '("ab!")))
+    (should (= asked 2))
+    ;; A real answer is remembered, as ever.
+    (all-completions "ab" table)
+    (should (= asked 2))))
+
 ;;;; The style
 
 (ert-deftest mega-pick-the-style-shows-what-does-not-contain-the-input ()

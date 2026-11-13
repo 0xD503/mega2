@@ -8,6 +8,11 @@ is then tagged in git as `vX.Y.Z`.
 
 ## Not yet released
 
+- `M-g I` goes to a definition anywhere in the project: type part of its
+  name, and the language server lists the functions, types and constants
+  it finds, with what each is and where, as you type. `M-,` comes back,
+  as `M-g i` is the same in the buffer. A request that a key interrupts
+  is asked again, rather than taken for an answer of nothing.
 - Replacing in the whole project works, and the README says how: `M-g a`,
   `C-o e`, then `e` and `M-%`; the buffer of hits says it too. Before,
   `M-%` from the top changed the line that names the search and stopped

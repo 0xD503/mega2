@@ -54,6 +54,13 @@ is not used to filter what comes back."
 
 ;;;; The table
 
+(defconst mega-pick-abandoned 'mega-pick-abandoned
+  "What a source returns when it gave up before it had an answer.
+As a language server is asked: a request to one does not stop on its own
+when a key is pressed, and is told to, and then returns.  The prompt
+then lists nothing for the moment and remembers nothing: remembered, an
+answer of nothing would be listed the next time the same text is there.")
+
 (defvar mega-pick--refresh nil
   "Function that makes the active pick prompt ask its source again.
 Bound while `mega-pick-read' is reading.")
@@ -85,8 +92,10 @@ answer, so that the next request asks SOURCE again."
          (unless (equal input known-input)
            ;; Assigned only after SOURCE returns: if it is interrupted, the
            ;; next request starts over, never offering a partial answer.
-           (setq known (funcall source input)
-                 known-input input))
+           (let ((answer (funcall source input)))
+             (if (eq answer mega-pick-abandoned)
+                 (setq known nil known-input 'none)
+               (setq known answer known-input input))))
          (let ((candidates (if predicate (seq-filter predicate known) known)))
            (cond ((eq action t) candidates)
                  ((eq action 'lambda) (and (member input candidates) t))
@@ -162,6 +171,18 @@ After the newest, what was being typed comes back, and that is the end."
   (interactive)
   (mega-pick--history-go -1))
 
+(defvar mega-pick-history-map
+  (let ((map (make-sparse-keymap)))
+    ;; The arrows go through what was typed before, as in a shell; C-n and
+    ;; C-p still go through the list.  M-p and M-n are Emacs's keys for the
+    ;; same, which past the newest would ask the source for every choice.
+    (dolist (key '("<up>" "M-p"))
+      (define-key map (kbd key) #'mega-pick-history-previous))
+    (dolist (key '("<down>" "M-n"))
+      (define-key map (kbd key) #'mega-pick-history-next))
+    map)
+  "Keys of a pick prompt with a history.")
+
 (defun mega-pick--keep-typed (history choice typed)
   "Keep TYPED in HISTORY, a history variable, in place of CHOICE.
 Emacs has put CHOICE, what the prompt returned, there."
@@ -178,7 +199,8 @@ and returns a list of strings; it may be slow, and may be abandoned.
 
 OPTIONS is a plist: :category (a symbol, default `mega-pick'), :initial
 (text to start with), :history (a history variable, which keeps what was
-typed, not what was chosen), and :keymap (extra
+typed, not what was chosen, and which the arrows go through), and
+:keymap (extra
 keys for the prompt, consulted before all others: before those of the
 list of choices as well, so that a prompt can give one of them a meaning
 of its own).  The text to start with is not selected: what is typed is
@@ -202,7 +224,9 @@ Returns the chosen string, or the typed input if nothing matched."
         (:append
          (lambda ()
            (use-local-map (make-composed-keymap
-                           (delq nil (list keymap mega-pick-typing-map))
+                           (delq nil (list keymap
+                                           (and history mega-pick-history-map)
+                                           mega-pick-typing-map))
                            (current-local-map)))
            ;; The list waits a moment before it is worked out, and the
            ;; screen is drawn meanwhile: what was typed or deleted shows at

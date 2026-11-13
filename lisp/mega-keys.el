@@ -57,6 +57,7 @@
      ("M-g a" mega-search-project "Search the project as you type; C-u first asks where")
      ("M-g s" mega-search-symbol  "Search the project for the symbol at point; C-u first asks where")
      ("M-g i" imenu               "Jump to a definition in this buffer")
+     ("M-g I" mega-lsp-project-symbol "Jump to a definition in the project, as you type")
      ("C-c p" mega-project-map    "Project: f file, p switch, b buffer, g grep, c compile, s shell")
      ("C-c t" mega-project-tree   "Show or hide the file tree"))
     ("Edit"
@@ -149,10 +150,11 @@ keymap in step.")
     ("In a prompt that searches as you type" mega-pick-typing-map mega-pick
      ("SPC" self-insert-command "A space, part of the pattern; so is \\ SPC")
      ("?"   self-insert-command "A question mark, part of the pattern"))
+    ("In such a prompt that keeps what you typed: search, symbols" mega-pick-history-map mega-pick
+     ("<up>, M-p"   mega-pick-history-previous "What was typed before this")
+     ("<down>, M-n" mega-pick-history-next     "What was typed after it, and at last what you were typing"))
     ("In the search prompt" mega-search-map mega-search
      ("C-j"   mega-search-preview          "Show the highlighted hit, and stay in the prompt")
-     ("<up>, M-p"   mega-pick-history-previous "The query searched for before this one")
-     ("<down>, M-n" mega-pick-history-next     "The next one, and at last what you were typing")
      ("C-o c" mega-search-cycle-case       "Case: smart, ignore, sensitive")
      ("C-o u" mega-search-toggle-untracked "Untracked files: in or out (git grep)")
      ("C-o i" mega-search-toggle-ignored   "Ignored files: in or out (git grep, ripgrep)")
