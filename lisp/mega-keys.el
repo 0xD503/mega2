@@ -151,6 +151,8 @@ keymap in step.")
      ("?"   self-insert-command "A question mark, part of the pattern"))
     ("In the search prompt" mega-search-map mega-search
      ("C-j"   mega-search-preview          "Show the highlighted hit, and stay in the prompt")
+     ("<up>, M-p"   mega-pick-history-previous "The query searched for before this one")
+     ("<down>, M-n" mega-pick-history-next     "The next one, and at last what you were typing")
      ("C-o c" mega-search-cycle-case       "Case: smart, ignore, sensitive")
      ("C-o u" mega-search-toggle-untracked "Untracked files: in or out (git grep)")
      ("C-o i" mega-search-toggle-ignored   "Ignored files: in or out (git grep, ripgrep)")

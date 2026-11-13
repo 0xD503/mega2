@@ -50,6 +50,15 @@
 ;;   C-g      leave: the windows are as they were, and a file that was
 ;;            opened only to be shown is closed again
 ;;
+;; What was searched for before is a key away, as in a shell:
+;;
+;;   <up>     the query before the one in the prompt (M-p too)
+;;   <down>   the one after it, and after the newest what you were typing
+;;            (M-n too).  C-n and C-p go through the hits.
+;;
+;; The history keeps the queries you typed, not the hits you took: a hit is
+;; a line of one of your files, and the history is kept on disk.
+;;
 ;; The settings stay for the session; the directory does not.  To search
 ;; only some of the files, add a path or glob after " -- ":
 ;;   handler -- src/*.rs
@@ -125,7 +134,16 @@ Git then searches what is tracked and nothing else: it will not do both.")
 (defvar mega-search-literal nil "Non-nil to take the pattern literally.")
 (defvar mega-search-word nil "Non-nil to match whole words only.")
 
-(defvar mega-search-history nil "What was searched for.")
+(defvar mega-search-history nil
+  "What was searched for: the queries typed, newest first.")
+
+(defun mega-search-forget-hits ()
+  "Drop from `mega-search-history' what is a hit and not a query.
+An older MEGA kept the hit that was taken there, a line of a file, and
+the history is kept on disk."
+  (setq mega-search-history
+        (seq-remove (lambda (entry) (and (stringp entry) (mega-search-parse entry)))
+                    mega-search-history)))
 
 (defvar mega-search--directory nil "Where the active search runs.")
 (defvar mega-search--root nil
@@ -504,6 +522,13 @@ How it works at the moment is in the prompt."
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-o") mega-search-options-map)
     (define-key map (kbd "C-j") #'mega-search-preview)
+    ;; The arrows go through what was searched for, as in a shell; C-n and
+    ;; C-p still go through the hits.  M-p and M-n are Emacs's keys for the
+    ;; same, which past the newest would ask the search for every line.
+    (dolist (key '("<up>" "M-p"))
+      (define-key map (kbd key) #'mega-pick-history-previous))
+    (dolist (key '("<down>" "M-n"))
+      (define-key map (kbd key) #'mega-pick-history-next))
     map)
   "Extra keys of the search prompt.")
 
@@ -668,6 +693,7 @@ moves the search to another directory while it is open."
     (when (file-remote-p directory)
       (user-error "MEGA searches this machine only, and %s is not on it"
                   (abbreviate-file-name directory)))
+    (mega-search-forget-hits)
     (let ((choice (unwind-protect
                       (mega-pick-read
                        (mega-search-prompt directory mega-search--backend)

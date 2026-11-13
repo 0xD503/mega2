@@ -157,6 +157,29 @@ minibuffer list on: the keys are simply waiting in the input queue."
                                           (or buffer-file-name (buffer-name))
                                           (line-number-at-pos))))
       (error (mega-terminal-probe--problem "the search failed: %S" err))))
+  ;; In the live search prompt, where the list has the arrows too, up is
+  ;; the query searched for before (asked for after use); and what the
+  ;; history keeps is that query, not the hit taken, a line of the file.
+  (defvar mega-search-history)
+  (let* ((project (file-name-as-directory
+                   (make-temp-file (expand-file-name "probe-" (getenv "MEGA_TEST_SANDBOX"))
+                                   t)))
+         (file (expand-file-name "notes.txt" project))
+         (default-directory project)
+         (mega-search-history (list "needle")))
+    (with-temp-file file (insert "one\ntwo\nthe needle is here\n"))
+    (condition-case err
+        (save-window-excursion
+          (mega-terminal-probe--typing "zz <up> RET"
+            (mega-search-project))
+          (unless (and (equal buffer-file-name file) (= (line-number-at-pos) 3))
+            (mega-terminal-probe--problem "after <up> the search ended in %S, line %s"
+                                          (or buffer-file-name (buffer-name))
+                                          (line-number-at-pos)))
+          (unless (equal mega-search-history '("needle"))
+            (mega-terminal-probe--problem "the search history holds %S"
+                                          mega-search-history)))
+      (error (mega-terminal-probe--problem "the search from its history failed: %S" err))))
   ;; Another directory, out of the project: chosen with C-o d while the
   ;; prompt is open, with what was typed kept, and asked for first with a
   ;; prefix argument.  The directory prompt is Emacs's own, as a person

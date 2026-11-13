@@ -173,6 +173,11 @@ searched from, its line in the middle and marked, with the prompt still open,
 so you can go down the list and look at the next. `C-g` then leaves
 everything as it was, and closes a file that was opened only to be shown.
 
+`Up` brings back what you searched for before, as in a shell, and `Down`
+goes forward again, to what you were typing; `C-n` and `C-p` go through the
+hits. The history keeps the queries you typed, never the hits, which are
+lines of your files.
+
 The prompt says how it searches: `[git  case:smart]` is git grep, case
 ignored unless you type a capital, and anything else that is on is named
 after it. That is changed in the prompt, while it is open and you are typing

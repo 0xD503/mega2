@@ -211,6 +211,77 @@ or (STRING . POINT); a bare string broke every key that completes."
     (should (equal (nreverse seen)
                    '(self-insert-command self-insert-command "ab")))))
 
+;;;; What was typed before
+
+(defvar mega-pick-test--history nil "A history for the prompts below.")
+
+(defun mega-pick-test--history-keys (note)
+  "Keys for a prompt: the arrows through its history, C-o r to call NOTE
+with what it holds and whether the cursor is at its end, and C-o t to
+take a hit, as RET on one does: the prompt then holds the hit, and is
+left."
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "<up>") #'mega-pick-history-previous)
+    (define-key map (kbd "<down>") #'mega-pick-history-next)
+    (define-key map (kbd "C-o r")
+                (lambda () (interactive)
+                  (funcall note (cons (minibuffer-contents-no-properties)
+                                      (= (point) (point-max))))))
+    (define-key map (kbd "C-o t")
+                (lambda () (interactive)
+                  (delete-minibuffer-contents)
+                  (insert "src/fruit.el:12:(banana)")
+                  (exit-minibuffer)))
+    map))
+
+(ert-deftest mega-pick-history-keeps-what-was-typed-not-the-hit-taken ()
+  "Asked for after use, with the arrows: the history held the hit taken,
+a line of a file, and so no query to make again; and it is kept on disk."
+  (let ((mega-pick-test--history (list "older")))
+    (should (equal (ert-simulate-keys (kbd "b a n C-o t")
+                     (mega-pick-read "Fruit: " #'mega-pick-test--fruit
+                                     :history 'mega-pick-test--history
+                                     :keymap (mega-pick-test--history-keys #'ignore)))
+                   "src/fruit.el:12:(banana)"))
+    (should (equal mega-pick-test--history '("ban" "older")))
+    ;; Typed again, a query is the newest, and is in the history once.
+    (ert-simulate-keys (kbd "o l d e r RET")
+      (mega-pick-read "Fruit: " #'mega-pick-test--fruit
+                      :history 'mega-pick-test--history))
+    (should (equal mega-pick-test--history '("older" "ban")))
+    ;; Nothing typed, nothing kept; and a prompt that was left is no search.
+    (ert-simulate-keys (kbd "SPC RET")
+      (mega-pick-read "Fruit: " #'mega-pick-test--fruit
+                      :history 'mega-pick-test--history))
+    (should (eq 'left (condition-case nil
+                          (ert-simulate-keys (kbd "x y z C-g")
+                            (mega-pick-read "Fruit: " #'mega-pick-test--fruit
+                                            :history 'mega-pick-test--history))
+                        (quit 'left))))
+    (should (equal mega-pick-test--history '("older" "ban")))))
+
+(ert-deftest mega-pick-history-goes-back-and-forth-up-to-what-is-typed ()
+  "Asked for after use: up goes to the query before, down to the next,
+and after the newest to what was being typed, and no further."
+  (let ((mega-pick-test--history (list "foo" "now" "bar"))
+        (seen nil))
+    (ert-simulate-keys (kbd (concat "n o w"
+                                    " <up> C-o r <up> C-o r <up> C-o r"
+                                    " <down> C-o r <down> C-o r <down> C-o r"
+                                    " <up> z C-o r RET"))
+      (mega-pick-read "Fruit: " #'mega-pick-test--fruit
+                      :history 'mega-pick-test--history
+                      :keymap (mega-pick-test--history-keys
+                               (lambda (entry) (push entry seen)))))
+    ;; "now", the query being typed, is passed over on the way: it would
+    ;; look like no move.  At the oldest, up stays; at what is typed, down.
+    ;; The cursor is at the end of the query each time, to add to it.
+    (should (equal (nreverse seen)
+                   '(("foo" . t) ("bar" . t) ("bar" . t)
+                     ("foo" . t) ("now" . t) ("now" . t)
+                     ("fooz" . t))))
+    (should (equal mega-pick-test--history '("fooz" "foo" "now" "bar")))))
+
 ;;;; Deleting in a file name
 
 (ert-deftest mega-minibuffer-backspace-deletes-a-character-of-a-file-name ()

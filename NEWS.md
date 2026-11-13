@@ -8,6 +8,12 @@ is then tagged in git as `vX.Y.Z`.
 
 ## Not yet released
 
+- The search prompt (`M-g a`) has a history: `Up` brings back the query
+  searched for before, `Down` the next one, and after the newest what you
+  were typing. `C-n` and `C-p` go through the hits, as before. It keeps
+  the queries you typed. Before, it kept the hit you took, which is a
+  line of one of your files, and that was saved to disk with the other
+  prompt histories. Such lines are dropped from it when you next search.
 - In the undo tree (`C-x u`) the state that is in the file is marked `s`.
   On it, it stays an `s`, highlighted as `@` is. Moving about the tree no
   longer loses which state that is: once it was lost, getting back to the

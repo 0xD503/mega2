@@ -624,6 +624,33 @@ They are in the prompt now, for as long as it is open."
 
 ;;;; The whole command
 
+(ert-deftest mega-search-the-arrows-go-through-what-was-searched-for ()
+  "Asked for after use.  C-n and C-p are left to go through the hits."
+  (dolist (key '("<up>" "M-p"))
+    (should (eq (lookup-key mega-search-map (kbd key)) 'mega-pick-history-previous)))
+  (dolist (key '("<down>" "M-n"))
+    (should (eq (lookup-key mega-search-map (kbd key)) 'mega-pick-history-next)))
+  (dolist (key '("C-n" "C-p"))
+    (should-not (lookup-key mega-search-map (kbd key)))))
+
+(ert-deftest mega-search-history-loses-the-hits-an-older-mega-kept ()
+  "It kept the hit taken, a line of one of your files, and on disk."
+  (let ((mega-search-history (list "needle" "src/a.el:12:the needle" "./b.c:3:x"
+                                   "handler -- src/*.rs")))
+    (mega-search-forget-hits)
+    (should (equal mega-search-history '("needle" "handler -- src/*.rs")))))
+
+(ert-deftest mega-search-history-is-cleared-of-hits-when-a-search-opens ()
+  (mega-test-with-directory project
+    (mega-test-write (expand-file-name "notes.txt" project) "the needle" "")
+    (let ((default-directory project)
+          (mega-search-history (list "src/a.el:12:the needle")))
+      (cl-letf (((symbol-function 'mega-pick-read) (lambda (&rest _) "zz"))
+                ((symbol-function 'mega-search-backend-for) (lambda (_) 'grep)))
+        (let ((inhibit-message t))
+          (mega-search-project)))
+      (should-not mega-search-history))))
+
 (ert-deftest mega-search-project-jumps-to-the-chosen-hit ()
   (mega-search-test--defaults
     (mega-test-with-directory dir

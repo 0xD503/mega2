@@ -21,6 +21,10 @@
 ;; The function runs while the minibuffer list is being computed, which Emacs
 ;; abandons when you type again.  If it runs a program through `mega-exec-run'
 ;; the program dies with it: typing is never blocked by a slow search.
+;;
+;; A prompt with a history keeps in it what was typed, the query, and not the
+;; choice that was taken: that is a line a program printed, a line of one of
+;; your files for a search, and no query to make again.
 
 ;;; Code:
 
@@ -127,13 +131,54 @@ Outside a prompt this does nothing."
     map)
   "Keys of every pick prompt: those that type what a query is made of.")
 
+;;;; What was typed before
+
+(defun mega-pick--history-go (step)
+  "Put the query STEP places older in the history into the prompt.
+STEP is 1 for an older one, -1 for a newer one, down to what was being
+typed before the history was gone into, and no further.  A query that
+is the one in the prompt, or the one being typed, is passed over: it
+would look like no move at all.  At either end nothing happens."
+  (let* ((history (minibuffer-history-value))
+         (history (if (listp history) history nil))
+         (now (minibuffer-contents-no-properties))
+         (typing (or minibuffer-text-before-history now))
+         (target (+ minibuffer-history-position step)))
+    (while (and (> target 0) (<= target (length history))
+                (member (nth (1- target) history) (list now typing)))
+      (setq target (+ target step)))
+    (when (<= 0 target (length history))
+      (goto-history-element target)
+      (goto-char (point-max)))))
+
+(defun mega-pick-history-previous ()
+  "Put the query typed before this one into the prompt."
+  (interactive)
+  (mega-pick--history-go 1))
+
+(defun mega-pick-history-next ()
+  "Put the query typed after this one into the prompt.
+After the newest, what was being typed comes back, and that is the end."
+  (interactive)
+  (mega-pick--history-go -1))
+
+(defun mega-pick--keep-typed (history choice typed)
+  "Keep TYPED in HISTORY, a history variable, in place of CHOICE.
+Emacs has put CHOICE, what the prompt returned, there."
+  (let ((value (symbol-value history)))
+    (when (and (consp value) (equal (car value) choice))
+      (set history (cdr value))))
+  (when (and history-add-new-input (string-match-p "[^[:space:]]" typed))
+    (add-to-history history typed)))
+
 (defun mega-pick-read (prompt source &rest options)
   "Read a choice from the candidates SOURCE returns for the input so far.
 PROMPT is the prompt string.  SOURCE is called with the current input
 and returns a list of strings; it may be slow, and may be abandoned.
 
 OPTIONS is a plist: :category (a symbol, default `mega-pick'), :initial
-(text to start with), :history (a history variable), and :keymap (extra
+(text to start with), :history (a history variable, which keeps what was
+typed, not what was chosen), and :keymap (extra
 keys for the prompt, consulted before all others: before those of the
 list of choices as well, so that a prompt can give one of them a meaning
 of its own).  The text to start with is not selected: what is typed is
@@ -143,6 +188,10 @@ Returns the chosen string, or the typed input if nothing matched."
   (let* ((category (or (plist-get options :category) 'mega-pick))
          (table+forget (mega-pick-table source category))
          (keymap (plist-get options :keymap))
+         (history (plist-get options :history))
+         ;; What the prompt held before the last key: before the key that
+         ;; took a choice, that is what was typed.
+         (typed nil)
          (mega-pick--refresh (cdr table+forget))
          ;; Whatever the user's styles are, this category is shown unfiltered.
          (completion-category-overrides
@@ -161,10 +210,16 @@ Returns the chosen string, or the typed input if nothing matched."
            ;; list skips the wait once the input is a few characters long,
            ;; which suits choices that are known; these come from a program,
            ;; and in a tree as large as Linux a search may take seconds.
-           (setq-local icomplete-max-delay-chars most-positive-fixnum)))
-      (completing-read prompt (car table+forget) nil nil
-                       (plist-get options :initial)
-                       (plist-get options :history)))))
+           (setq-local icomplete-max-delay-chars most-positive-fixnum)
+           (when history
+             (add-hook 'pre-command-hook
+                       (lambda () (setq typed (minibuffer-contents-no-properties)))
+                       nil t))))
+      (let ((choice (completing-read prompt (car table+forget) nil nil
+                                     (plist-get options :initial) history)))
+        (when (and history typed)
+          (mega-pick--keep-typed history choice typed))
+        choice))))
 
 (provide 'mega-pick)
 ;;; mega-pick.el ends here
