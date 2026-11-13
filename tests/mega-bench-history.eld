@@ -136,7 +136,9 @@
    :reason "Established: the bench as rebuilt after the architecture review."))
  ("draw the cheat sheet 20 times"
   (:ms 6.2 :date "2026-10-10" :commit "915d253"
-   :reason "Established: the bench as rebuilt after the architecture review."))
+   :reason "Established: the bench as rebuilt after the architecture review.")
+  (:ms 8.2 :date "2026-11-12" :commit "05c5b37"
+   :reason "More to draw: a Git group of nine keys (05c5b37), M-g I and the places of the search's history and of its buffer of hits (eb59f7b, ae4e37e).  Measured three times each: 7.1 ms before them, 7.6 after eb59f7b, 8.2 after 05c5b37; the time follows the number of rows, and nothing else in the drawing changed."))
  ("language server: load eglot and connect, first time"
   (:ms 62 :limit 400 :date "2026-10-10" :commit "915d253"
    :reason "Established: the bench as rebuilt after the architecture review."))
@@ -148,4 +150,7 @@
    :reason "Established with the feature: a millionth of a second for each line between the cursor and the outermost line that opens a block around it, paid when the cursor comes to a line that is not beside the last."))
  ("who changed a line: ask git and show it, five lines"
   (:ms 30 :date "2026-10-10" :commit "a95082f"
-   :reason "Established with the feature: one git for each line, in the background, in a file with forty changes behind it.")))
+   :reason "Established with the feature: one git for each line, in the background, in a file with forty changes behind it."))
+ ("what changed since the commit: ask git and mark, a long file, five times"
+  (:ms 38 :date "2026-11-12" :commit "05c5b37"
+   :reason "Established with the feature: two gits each time, the committed text and the comparison, in the background, for a file of 2000 lines with forty of them changed and not saved.  Three runs gave 39, 34 and 50 ms.")))
