@@ -186,9 +186,25 @@ setting at once. (Anywhere else `C-o` is Emacs's own key and opens a line.)
 `C-o ?` lists the keys; `C-o c` changes case, `w` whole words, `l` literal
 text, `e` exports the hits to an editable buffer. `C-o b` switches to ripgrep, then plain grep, then back,
 and the session stays with what you chose; `(setq mega-search-backend 'rg)`
-in `local.el` makes ripgrep the one to start with. `needle -- src/*.rs`
-searches part of the project. A space in the pattern is a space, as `\ ` is
-too; `\ --\ ` looks for ` -- ` itself.
+in `local.el` makes ripgrep the one to start with. A space in the pattern
+is a space, as `\ ` is too; `\ --\ ` looks for ` -- ` itself.
+
+After ` -- ` you name which files to search, and with `!` which to leave
+out. Every name counts from the directory searched: a name alone is any
+file or directory of that name, at any depth, and one that begins with `/`
+is only the one right there, as in a `.gitignore`. `*` stays in a
+directory and `**` goes into them.
+
+- `needle -- src`: every directory called `src`, and what is in it
+- `needle -- /src`: only the `src` at the top
+- `needle -- *.rs !vendor`: Rust files, none of them in a `vendor`
+- `needle -- !/vendor`: everything but the `vendor` at the top
+- `needle -- /src !src/gen`: `src`, without `src/gen`
+
+git grep and ripgrep search exactly that. grep knows names but not paths:
+for what it cannot do, `!/vendor` for one, the prompt says so and lists
+nothing, rather than hits from files you left out. Like the rest of the
+query, these names come back with `Up`.
 
 A search starts at the root of the project, every time. `C-o d` moves it to
 another directory while the prompt is open, in the project or out of it,

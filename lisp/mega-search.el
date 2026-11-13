@@ -60,8 +60,10 @@
 ;; a line of one of your files, and the history is kept on disk.
 ;;
 ;; The settings stay for the session; the directory does not.  To search
-;; only some of the files, add a path or glob after " -- ":
-;;   handler -- src/*.rs
+;; only some of the files, or to leave some out, name them after " -- ":
+;;   handler -- src !src/gen !*_test.go
+;; `vendor' is any directory or file of that name, `/vendor' only the one
+;; right in the directory searched; `!' leaves out.  See "Which files" below.
 ;;
 ;; Which files are searched is the one thing the three programs do not
 ;; agree on, because only git knows what a checkout tracks:
@@ -154,6 +156,9 @@ What the prompt names the directory by, wherever the search has moved.")
   "Directory names the active search passes over, unless it includes ignored files.
 Set for a project without version control: see `mega-project-left-out'.")
 (defvar mega-search--export nil "Set by `mega-search-export' as it leaves the prompt.")
+(defvar mega-search--note nil
+  "Why the program in use cannot search the files the query asks for, or nil.
+The prompt says it: see `mega-search--source'.")
 (defvar mega-search--shown nil
   "The buffers that were opened to show a hit, while the prompt is open.")
 (defvar mega-search--shown-line nil
@@ -207,6 +212,104 @@ That is `mega-search-backend', then the rest of git, rg and grep."
             (split-string (match-string 2 input) " +" t))
     (cons input nil)))
 
+;;;; Which files: what follows " -- "
+;;
+;; After " -- " a query may name what to search and what to leave out:
+;;
+;;   handler -- src !src/gen !*_test.go
+;;
+;; Every name counts from the directory searched, the root of the project
+;; or wherever `C-o d' moved the search.  A name without a slash is one at
+;; any depth below it: `vendor', `*.rs'.  One that begins with a slash, or
+;; has one inside, is a path from it: `/vendor' is the one right there and
+;; no other.  A directory stands for everything in it.  `*' does not go
+;; into a directory and `**' does.  `!' leaves out; with nothing but such
+;; names, everything else is searched.  `\!' is a name that begins with !.
+;;
+;; That is how a .gitignore reads names, and each program is told it in
+;; words of its own, so that the same query searches the same files with
+;; any of them.  grep knows file and directory names but not paths, and
+;; says so for what it cannot do, rather than search other files.
+
+(defun mega-search-path-rule (word)
+  "WORD, one name of what follows \" -- \", as (EXCLUDE ANCHORED PATTERN WORD).
+EXCLUDE is non-nil for a name to leave out, ANCHORED for a path from the
+directory searched, and PATTERN is the name without the marks that say
+so.  Nil for a name that names nothing: `/', or `!' alone."
+  (let ((exclude nil) (name word))
+    (cond ((string-prefix-p "\\!" name) (setq name (substring name 1)))
+          ((string-prefix-p "!" name) (setq exclude t name (substring name 1))))
+    (let* ((rooted (string-match-p "\\`\\.?/" name))
+           (pattern (replace-regexp-in-string
+                     "/+\\'" "" (replace-regexp-in-string "\\`\\(?:\\.?/\\)+" "" name))))
+      (unless (string-empty-p pattern)
+        (list exclude (and (or rooted (string-search "/" pattern)) t) pattern word)))))
+
+(defun mega-search-path-rules (words)
+  "The rules WORDS make, what follows \" -- \": see `mega-search-path-rule'."
+  (delq nil (mapcar #'mega-search-path-rule words)))
+
+(defun mega-search--glob-p (pattern)
+  "Non-nil if PATTERN is a glob and not a plain name."
+  (string-match-p "[*?[]" pattern))
+
+(defun mega-search--git-pathspecs (rules)
+  "RULES as git pathspecs: the name, and everything in it if it is a directory."
+  (mapcan (lambda (rule)
+            (pcase-let* ((`(,exclude ,anchored ,pattern) rule)
+                         (magic (if exclude ":(exclude,glob)" ":(glob)"))
+                         (path (if anchored pattern (concat "**/" pattern))))
+              (list (concat magic path) (concat magic path "/**"))))
+          rules))
+
+(defun mega-search--rg-globs (rules)
+  "RULES as ripgrep globs: what to search first, and then what to leave out.
+Of the globs that fit a file ripgrep follows the last, so a name left out
+stays out even inside one that is searched."
+  (let ((in nil) (out nil))
+    (dolist (rule rules)
+      (pcase-let ((`(,exclude ,anchored ,pattern) rule))
+        (if exclude
+            (push (concat "--glob=!" (if anchored "/" "") pattern) out)
+          ;; A glob that names a directory leaves what is in it out, unless
+          ;; a second one takes that in.
+          (push (if anchored (concat "--glob=/" pattern) (concat "--glob=" pattern)) in)
+          (push (if anchored (concat "--glob=/" pattern "/**")
+                  (concat "--glob=**/" pattern "/**"))
+                in))))
+    (append (nreverse in) (nreverse out))))
+
+(defun mega-search-cannot (backend words)
+  "Why BACKEND cannot search the files WORDS ask for, or nil if it can.
+WORDS is what follows \" -- \" in a query."
+  (let ((rules (mega-search-path-rules words)))
+    (or (seq-some (lambda (rule)
+                    (and (member ".." (split-string (nth 2 rule) "/"))
+                         (format "%s: a name counts from where the search is, C-o d to search elsewhere"
+                                 (nth 3 rule))))
+                  rules)
+        (and (eq backend 'grep) (mega-search--grep-cannot rules)))))
+
+(defun mega-search--grep-cannot (rules)
+  "Why grep cannot search the files RULES ask for, or nil if it can.
+It takes a path to search, and a name to search or leave out at any
+depth, of a file or of a directory; nothing else."
+  (let ((paths (seq-filter (lambda (rule) (and (not (car rule)) (nth 1 rule))) rules))
+        (names (seq-filter (lambda (rule) (and (not (car rule)) (not (nth 1 rule)))) rules)))
+    (or (seq-some
+         (lambda (rule)
+           (pcase-let ((`(,exclude ,anchored ,pattern ,word) rule))
+             (cond ((and exclude anchored)
+                    (format "grep can leave out a name, not the path %s: C-o b" word))
+                   ((and anchored (mega-search--glob-p pattern))
+                    (format "grep cannot search the pattern %s, only a path: C-o b" word))
+                   ((not (or exclude anchored (mega-search--glob-p pattern)))
+                    (format "grep cannot search every %s: /%s is the one here, or C-o b"
+                            word pattern)))))
+         rules)
+        (and paths names
+             "grep cannot search a path and a name at once: C-o b"))))
+
 (defun mega-search--ignore-case-p (pattern)
   "Non-nil if PATTERN should be matched without regard to case."
   (pcase mega-search-case
@@ -217,10 +320,13 @@ That is `mega-search-backend', then the rest of git, rg and grep."
 
 (defun mega-search-command (backend pattern paths)
   "Return (PROGRAM . ARGS) searching for PATTERN with BACKEND.
-PATHS, a list of paths or globs, limits the search; nil means everything.
-The command reflects the current search settings, and is an argument
-list: PATTERN and PATHS are passed as they are, never through a shell."
-  (let ((ignore-case (mega-search--ignore-case-p pattern)))
+PATHS, what follows \" -- \" in the query, says which files: see
+`mega-search-path-rule'; nil means all.  For what grep cannot do, see
+`mega-search-cannot', which is to be asked first.  The command reflects
+the current search settings, and is an argument list: PATTERN and PATHS
+are passed as they are, never through a shell."
+  (let ((ignore-case (mega-search--ignore-case-p pattern))
+        (rules (mega-search-path-rules paths)))
     (pcase backend
       ('rg
        `("rg" "--line-number" "--no-heading"
@@ -238,7 +344,7 @@ list: PATTERN and PATHS are passed as they are, never through a shell."
                            mega-search--left-out)))
          ,@(when mega-search-literal '("--fixed-strings"))
          ,@(when mega-search-word '("--word-regexp"))
-         ,@(mapcar (lambda (path) (concat "--glob=" path)) paths)
+         ,@(mega-search--rg-globs rules)
          ,(concat "--regexp=" pattern)
          ;; An explicit directory: with none, rg reads standard input.
          "."))
@@ -261,10 +367,18 @@ list: PATTERN and PATHS are passed as they are, never through a shell."
                  (mega-search-untracked '("--untracked")))
          ,@(when mega-search-word '("--word-regexp"))
          "-e" ,pattern
-         "--" ,@paths))
+         "--" ,@(mega-search--git-pathspecs rules)))
       ('grep
        `("grep" "--recursive" "--line-number" "--binary-files=without-match"
-         "--color=always" "--exclude-dir=.git"
+         "--color=always"
+         ;; The names to search, before every name to leave out.  Of those
+         ;; that fit a file grep follows the last, and one that fits none
+         ;; is left out when the first of them is one to search.
+         ,@(mapcan (lambda (rule)
+                     (and (not (car rule)) (not (nth 1 rule))
+                          (list (concat "--include=" (nth 2 rule)))))
+                   rules)
+         "--exclude-dir=.git"
          ,(if mega-search-literal "--fixed-strings" "--perl-regexp")
          ,@(when ignore-case '("--ignore-case"))
          ;; Names of a dot and something more.  Plain ".*" would take in
@@ -273,10 +387,18 @@ list: PATTERN and PATHS are passed as they are, never through a shell."
          ,@(unless mega-search-ignored
              (mapcar (lambda (name) (concat "--exclude-dir=" name))
                      mega-search--left-out))
+         ,@(mapcan (lambda (rule)
+                     (and (car rule) (not (nth 1 rule))
+                          (list (concat "--exclude=" (nth 2 rule))
+                                (concat "--exclude-dir=" (nth 2 rule)))))
+                   rules)
          ,@(when mega-search-word '("--word-regexp"))
          ,(concat "--regexp=" pattern)
          ;; A path is a path, even one that begins with a dash.
-         "--" ,@(or paths '(".")))))))
+         "--" ,@(or (mapcan (lambda (rule)
+                              (and (not (car rule)) (nth 1 rule) (list (nth 2 rule))))
+                            rules)
+                    '(".")))))))
 
 ;;;; Running it
 
@@ -366,7 +488,9 @@ than `mega-search-min-input' finds nothing, without running anything."
                       (mega-search-backend-for directory)))
          (split (mega-search-split input))
          (pattern (car split)))
-    (when (and backend (>= (length pattern) mega-search-min-input))
+    (when (and backend (>= (length pattern) mega-search-min-input)
+               ;; Rather nothing than the hits of files not asked for.
+               (not (mega-search-cannot backend (cdr split))))
       (let ((command (mega-search-command backend pattern (cdr split)))
             (process-environment (if (eq backend 'grep)
                                      (append mega-search--grep-colours
@@ -378,6 +502,18 @@ than `mega-search-min-input' finds nothing, without running anything."
                                        :directory directory
                                        :local t
                                        :limit (or limit mega-search-max-results))))))))
+
+(defun mega-search--source (input)
+  "The hits for INPUT, for the prompt; it says why when there can be none.
+That is when the program in use cannot search the files the query in
+the prompt asks for: then the prompt says so.  Emacs asks about other
+text too, the empty string among it, and that says nothing of the query."
+  (when (and (minibufferp) (equal input (minibuffer-contents-no-properties)))
+    (let ((note (mega-search-cannot mega-search--backend (cdr (mega-search-split input)))))
+      (unless (equal note mega-search--note)
+        (setq mega-search--note note)
+        (mega-pick-say (mega-search-prompt mega-search--directory mega-search--backend)))))
+  (mega-search-run input))
 
 ;;;; Changing the settings from the prompt
 
@@ -684,6 +820,7 @@ moves the search to another directory while it is open."
          (mega-search--backend (mega-search-backend-for directory))
          (mega-search--left-out (mega-project-left-out directory))
          (mega-search--export nil)
+         (mega-search--note nil)
          (mega-search--shown nil)
          (mega-search--shown-line nil)
          (mega-search--showed nil)
@@ -697,7 +834,7 @@ moves the search to another directory while it is open."
     (let ((choice (unwind-protect
                       (mega-pick-read
                        (mega-search-prompt directory mega-search--backend)
-                       #'mega-search-run
+                       #'mega-search--source
                        :category 'mega-search
                        :initial initial
                        :history 'mega-search-history
@@ -733,10 +870,11 @@ DIRECTORY itself."
 Where, how the search is set at the moment, and where the keys are that
 change it: they mean something only while this prompt is open, and
 there is nowhere else to learn that at the moment it matters."
-  (format "Search %s [%s] (C-o ? for keys): "
+  (format "Search %s [%s]%s (C-o ? for keys): "
           (mega-search-place directory mega-search--root)
           (let ((mega-search--backend backend))
-            (mega-search-describe))))
+            (mega-search-describe))
+          (if mega-search--note (concat "  " mega-search--note) "")))
 
 ;;;; Searching somewhere else
 

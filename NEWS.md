@@ -8,6 +8,14 @@ is then tagged in git as `vX.Y.Z`.
 
 ## Not yet released
 
+- The search can leave files out: after ` -- `, `!vendor` leaves out
+  every directory or file called `vendor`, and `!/vendor` only the one
+  right in the directory searched. Names to search follow the same rules,
+  as in a `.gitignore`, and mean the same to git grep, ripgrep and grep.
+  Before, `-- src` found nothing with ripgrep, `-- *.rs` nothing with grep,
+  and `src/*.rs` went into `src/gen` with git grep only; it no longer
+  does, `src/**/*.rs` does. What grep cannot do, such as leaving out a
+  path, the prompt says, and lists nothing.
 - The search prompt (`M-g a`) has a history: `Up` brings back the query
   searched for before, `Down` the next one, and after the newest what you
   were typing. `C-n` and `C-p` go through the hits, as before. It keeps

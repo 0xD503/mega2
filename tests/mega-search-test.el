@@ -70,6 +70,117 @@ each containing the word needle in a different case."
   (let ((mega-search-case 'sensitive))
     (should-not (mega-search--ignore-case-p "needle"))))
 
+;;;; Which files: what follows " -- "
+
+(ert-deftest mega-search-path-names-are-read-as-a-gitignore-reads-them ()
+  (dolist (case '(("vendor"     nil nil "vendor")
+                  ("vendor/"    nil nil "vendor")
+                  ("*.rs"       nil nil "*.rs")
+                  ("/vendor"    nil t   "vendor")
+                  ("./vendor"   nil t   "vendor")
+                  ("src/gen"    nil t   "src/gen")
+                  ("!vendor"    t   nil "vendor")
+                  ("!/vendor"   t   t   "vendor")
+                  ("!src/gen/"  t   t   "src/gen")
+                  ;; A name that begins with !, and is to be searched.
+                  ("\\!x"       nil nil "!x")))
+    (should (equal (mega-search-path-rule (car case))
+                   (append (cdr case) (list (car case))))))
+  ;; Names of nothing.
+  (should-not (mega-search-path-rule "/"))
+  (should-not (mega-search-path-rule "!"))
+  (should-not (mega-search-path-rule "!/")))
+
+(defconst mega-search-test--tree
+  '("src/a.rs" "src/gen/b.rs" "vendor/c.rs" "docs/d.md" "top.rs"
+    "lib/src/f.rs" "lib/vendor/e.rs" "lib/x/vendor/g.rs")
+  "The files of `mega-search-test--paths', each with a needle in it.")
+
+(defconst mega-search-test--paths
+  '(;; Searched for.  A name at any depth, a path from the top.
+    ("" "src" ("lib/src/f.rs" "src/a.rs" "src/gen/b.rs") grep)
+    ("" "/src" ("src/a.rs" "src/gen/b.rs"))
+    ("" "*.rs" ("lib/src/f.rs" "lib/vendor/e.rs" "lib/x/vendor/g.rs"
+                "src/a.rs" "src/gen/b.rs" "top.rs" "vendor/c.rs"))
+    ;; A star does not go into a directory, two do.
+    ("" "src/*.rs" ("src/a.rs") grep)
+    ("" "src/**/*.rs" ("src/a.rs" "src/gen/b.rs") grep)
+    ("" "/src /docs" ("docs/d.md" "src/a.rs" "src/gen/b.rs"))
+    ;; Each name adds files.
+    ("" "/src *.md" ("docs/d.md" "src/a.rs" "src/gen/b.rs") grep)
+    ;; Left out: at any depth, or the one at the top only.
+    ("" "!vendor" ("docs/d.md" "lib/src/f.rs" "src/a.rs" "src/gen/b.rs" "top.rs"))
+    ("" "!/vendor" ("docs/d.md" "lib/src/f.rs" "lib/vendor/e.rs" "lib/x/vendor/g.rs"
+                    "src/a.rs" "src/gen/b.rs" "top.rs")
+     grep)
+    ("" "!*.rs" ("docs/d.md"))
+    ("" "*.rs !vendor" ("lib/src/f.rs" "src/a.rs" "src/gen/b.rs" "top.rs"))
+    ;; Left out of what is searched.
+    ("" "/src !src/gen" ("src/a.rs") grep)
+    ;; From where the search is, after C-o d.
+    ("lib/" "!/vendor" ("src/f.rs" "x/vendor/g.rs") grep)
+    ("lib/" "!vendor" ("src/f.rs"))
+    ("lib/" "/src" ("src/f.rs")))
+  "Queries for `mega-search-paths-mean-the-same-to-every-program':
+(WHERE NAMES FILES . CANNOT).  WHERE is the directory searched, in the
+tree, NAMES what follows \" -- \", FILES what it finds; and CANNOT, the
+programs that say they cannot, and find nothing.")
+
+(ert-deftest mega-search-paths-mean-the-same-to-every-program ()
+  "The same query searches the same files, whichever program searches."
+  (skip-unless (executable-find "git"))
+  (mega-search-test--defaults
+    (mega-test-with-directory dir
+      (dolist (file mega-search-test--tree)
+        (mega-test-write (expand-file-name file dir) (concat "needle in " file) ""))
+      (mega-search-test--git dir "init" "--quiet")
+      (mega-search-test--git dir "add" "--all")
+      (dolist (backend (seq-filter (lambda (backend)
+                                     (executable-find (symbol-name backend)))
+                                   '(git rg grep)))
+        (pcase-dolist (`(,where ,names ,files . ,cannot) mega-search-test--paths)
+          (let* ((query (concat "needle -- " names))
+                 (said (mega-search-cannot backend (cdr (mega-search-split query))))
+                 (found (mega-search-test--files
+                         (mega-search-run query (expand-file-name where dir) backend))))
+            (if (memq backend cannot)
+                (should (equal (list backend where names (and said t) found)
+                               (list backend where names t nil)))
+              (should (equal (list backend where names said found)
+                             (list backend where names nil files))))))))))
+
+(ert-deftest mega-search-a-name-out-of-the-search-is-refused ()
+  (dolist (backend '(git rg grep))
+    (should (string-match-p "C-o d" (mega-search-cannot backend '("../other"))))
+    (should (string-match-p "C-o d" (mega-search-cannot backend '("!src/../.."))))))
+
+(ert-deftest mega-search-the-prompt-says-why-a-program-cannot ()
+  "grep is told nothing it cannot do: the prompt says so, and lists nothing."
+  (mega-test-with-directory dir
+    (let ((mega-search--directory dir) (mega-search--root dir)
+          (mega-search--backend 'grep) (mega-search--note nil)
+          (typed nil) (said nil))
+      (cl-letf (((symbol-function 'mega-pick-say) (lambda (prompt) (push prompt said)))
+                ((symbol-function 'mega-exec-lines) (lambda (&rest _) (list "a.c:1:needle")))
+                ;; What the prompt holds.
+                ((symbol-function 'minibufferp) #'always)
+                ((symbol-function 'minibuffer-contents-no-properties) (lambda () typed)))
+        (setq typed "needle -- !/vendor")
+        (should-not (mega-search--source typed))
+        (should (string-match-p "grep can leave out a name, not the path !/vendor: C-o b"
+                                (car said)))
+        ;; Said once, not at every key; and Emacs asking about other text,
+        ;; as it does, is no reason to stop saying it.
+        (mega-search--source typed)
+        (mega-search--source "")
+        (should (= (length said) 1))
+        ;; A query it can search: the prompt is as ever, and the hits are there.
+        (setq typed "needle -- !vendor")
+        (should (mega-search--source typed))
+        (should (= (length said) 2))
+        (should-not (string-match-p "grep" (replace-regexp-in-string
+                                            "\\[grep" "" (car said))))))))
+
 ;;;; The command lines
 
 (ert-deftest mega-search-rg-command ()
@@ -87,7 +198,8 @@ each containing the word needle in a different case."
                        "--color=always" "--colors=match:none" "--colors=match:style:bold"
                        "--max-columns=300" "--max-columns-preview"
                        "--case-sensitive" "--no-ignore" "--fixed-strings"
-                       "--word-regexp" "--glob=src/*.rs" "--regexp=Needle" "."))))))
+                       "--word-regexp" "--glob=/src/*.rs" "--glob=/src/*.rs/**"
+                       "--regexp=Needle" "."))))))
 
 (ert-deftest mega-search-git-command ()
   "The base is the user's `git grep -PnI', spelled with long options."
@@ -106,7 +218,8 @@ each containing the word needle in a different case."
                      "-c" "color.grep.selected=normal"
                      "--no-pager" "grep" "--line-number" "-I" "--color=always"
                      "--no-full-name" "--no-column"
-                       "--perl-regexp" "--untracked" "-e" "needle" "--" "src"))))
+                       "--perl-regexp" "--untracked" "-e" "needle"
+                       "--" ":(glob)**/src" ":(glob)**/src/**"))))
     (let ((mega-search-ignored t) (mega-search-literal t) (mega-search-word t))
       (should (equal (mega-search-command 'git "Needle" nil)
                      '("git" "-c" "color.grep.match=bold" "-c" "color.grep.matchSelected=bold"
@@ -126,7 +239,7 @@ each containing the word needle in a different case."
     (let ((mega-search-hidden nil))
       (should (member "--exclude-dir=.?*" (mega-search-command 'grep "x" nil))))
     ;; A path that begins with a dash is still a path.
-    (should (equal (last (mega-search-command 'grep "x" '("-rf")) 2)
+    (should (equal (last (mega-search-command 'grep "x" '("/-rf")) 2)
                    '("--" "-rf")))))
 
 (ert-deftest mega-search-a-project-without-version-control-is-searched-without-its-build ()
